@@ -131,6 +131,7 @@ class Profile(AbstractBaseUser,PermissionsMixin):
     image = models.ImageField(_('Avatar'), default='default.jpg', upload_to='profile_pics')
     birthday = models.DateField(_('Birthday'),)
     sex = models.CharField(_('Gender'),max_length=16, choices=sexes)
+    bio = models.TextField(_('Bio'), blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     country = CountryField(blank=True)
     region = models.CharField(max_length=255, blank=True)
@@ -206,8 +207,10 @@ class Message(models.Model):
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name="messages")
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='message_sender')
     content = models.TextField()
+    media = models.ForeignKey(MediaMessage, on_delete=models.CASCADE, related_name="message_media")
     timestamp = models.DateTimeField(auto_now_add=True)
-    is_read = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="readers")
+    is_read_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="read_messages", blank=True)
+    delivered = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Message from {self.sender} to {self.receiver}"

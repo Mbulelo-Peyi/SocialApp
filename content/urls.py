@@ -8,5 +8,6 @@ router.register(r'comment-reply', views.CommentReplyViewSet, basename='comment-r
 
 urlpatterns = [
     path('api/', include(router.urls), name='api'),
+    path('api/feed/', views.UserPostFeedView.as_view(), name='feed'),
 
 ]

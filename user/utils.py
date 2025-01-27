@@ -1,7 +1,7 @@
 from ipware.ip import get_client_ip
 from django.contrib.gis.geoip2 import GeoIP2
 from django_user_agents.utils import get_user_agent
-from user.models import MembershipRequest, Community
+from user.models import MembershipRequest, Community, MediaMessage
 from django.contrib.contenttypes.models import ContentType
 
 def get_client_ip(request):
@@ -55,3 +55,14 @@ def get_user_sent_community_requests(request):
     sender = ContentType.objects.get_for_model(user)
     community_requests = MembershipRequest.objects.filter(user=user,sender_content_type=sender)
     return community_requests
+
+
+def create_media_files(request,files:list)->list:
+    media_files = []
+    for obj in files:
+        media = MediaMessage.objects.create(
+            user=request.user,
+            media_file = obj
+        )
+        media_files.append(media)
+    return media_files

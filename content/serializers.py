@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from django.conf import settings
+from django_countries.serializer_fields import CountryField
 from content.utils import get_community_model
 from content.models import(
     PostFile,
@@ -43,6 +43,7 @@ class GenericAuthorRelatedField(serializers.RelatedField):
 
 class PostSerializer(serializers.ModelSerializer):
     author = GenericAuthorRelatedField(read_only=True)
+    country = CountryField(required=False)
     media = PostFileSerializer(required=False, many=True)
     tags = ProfileSerializer(required=False, many=True)
     hashtags = TagSerializer(required=False, many=True)
@@ -65,6 +66,7 @@ class PostSerializer(serializers.ModelSerializer):
 class ReactionSerializer(serializers.ModelSerializer):
     post = PostSerializer(read_only=True)
     user = ProfileSerializer(read_only=True)
+    country = CountryField(required=False)
 
     class Meta:
         model = Reaction
@@ -73,6 +75,7 @@ class ReactionSerializer(serializers.ModelSerializer):
 class CommentSerializer(serializers.ModelSerializer):
     post = PostSerializer(read_only=True)
     user = ProfileSerializer(read_only=True)
+    country = CountryField(required=False)
     like = ProfileSerializer(required=False, many=True)
     dislike = ProfileSerializer(required=False, many=True)
 

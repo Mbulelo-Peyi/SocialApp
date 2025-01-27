@@ -8,6 +8,10 @@ def create_community(sender, instance, created, **kwargs):
     if created:
         role = CommunityRole.objects.create(user=instance.created_by,community=instance,role='Admin')
         role.save()
+        name = f"{instance.name} group chat"
+        chat = ChatRoom.objects.create(name=name, is_group=True)
+        chat.members.add(instance.created_by)
+        chat.save()
 
 # for request if approved add to community if declined delete request
 @receiver(post_save, sender=MembershipRequest)

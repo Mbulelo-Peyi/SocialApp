@@ -25,9 +25,11 @@ from rest_framework_simplejwt.views import (
     TokenRefreshSlidingView,
 )
 from user import views as user_views
+from .consumers import ChatConsumer
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('ws/chat/<int:room_id>/', ChatConsumer.as_asgi()),
     path('api-auth/', include('rest_framework.urls')),
     path('auth/', include('djoser.urls')),
     path('auth/', include('djoser.urls.jwt')),

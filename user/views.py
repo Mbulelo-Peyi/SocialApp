@@ -6,6 +6,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from djoser.email import ActivationEmail
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
+from django.db.models import Q
 import gzip
 from pathlib import Path
 from difflib import SequenceMatcher
@@ -13,7 +14,13 @@ from difflib import SequenceMatcher
 #
 from user.serializers import *
 from user.models import *
-from user.utils import get_info, get_community_requests, get_user_community_requests,get_user_sent_community_requests
+from user.utils import (
+    get_info, 
+    get_community_requests, 
+    get_user_community_requests,
+    get_user_sent_community_requests,
+    create_media_files
+    )
 from user.banned_users import get_cleared
 
 
@@ -104,7 +111,9 @@ class ProfileViewSet(viewsets.ModelViewSet):
         friendship_status0 = Friendship.objects.filter(sender=user,receiver=me, is_active=True)
         friendship_status1 = Friendship.objects.filter(sender=me,receiver=user, is_active=True)
         if friendship_status0.exists() or friendship_status1.exists():
-            friends = Friendship.objects.filter(sender=user, is_active=True).union(Friendship.objects.filter(receiver=user, is_active=True))
+            friends = Friendship.objects.filter(
+                Q(sender=user, is_active=True) | Q(receiver=user, is_active=True)
+            ).select_related("sender", "receiver")
             serializer = FriendshipSerializer(friends, many=True, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(_("Unauthorized action"), status=status.HTTP_401_UNAUTHORIZED)
@@ -112,7 +121,9 @@ class ProfileViewSet(viewsets.ModelViewSet):
     @action(["get"], detail=False)
     def my_friends(self, request, *args, **kwargs):
         user = request.user
-        friends = Friendship.objects.filter(sender=user, is_active=True).union(Friendship.objects.filter(receiver=user, is_active=True))
+        friends = Friendship.objects.filter(
+            Q(sender=user, is_active=True) | Q(receiver=user, is_active=True)
+        ).select_related("sender", "receiver")
         serializer = FriendshipSerializer(friends, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -334,6 +345,47 @@ class CommunityViewSet(viewsets.ModelViewSet):
         serializer = MembershipRequestSerializer(community_requests, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(["post"], detail=True)
+    def group_chat_add(self, request, *args, **kwargs):
+        community = self.get_object()
+        data = request.data
+        user = get_object_or_404(Profile, id=data['user_id'])
+        room = get_object_or_404(ChatRoom, id=data['room_id'], community=community)
+        community_role = CommunityRole.objects.filter(
+            community=community, 
+            user=request.user
+        ).first()
+
+        if not community_role or community_role.role not in ["Admin", "Moderator"]:
+            raise ValidationError({
+                "error": "You are not authorized to create posts in this community."
+            })
+        if community.members.filter(id=user.id).exists():
+            room.members.add(user)
+            return Response(_("User added"), status=status.HTTP_200_OK)
+        return Response(_("User not in group"), status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(["post"], detail=True)
+    def group_chat_remove(self, request, *args, **kwargs):
+        community = self.get_object()
+        data = request.data
+        user = get_object_or_404(Profile, id=data['user_id'])
+        room = get_object_or_404(ChatRoom, id=data['room_id'], community=community)
+        community_role = CommunityRole.objects.filter(
+            community=community, 
+            user=request.user
+        ).first()
+
+        if not community_role or community_role.role not in ["Admin", "Moderator"]:
+            raise ValidationError({
+                "error": "You are not authorized to create posts in this community."
+            })
+        if community.members.filter(id=user.id).exists():
+            room.members.remove(user)
+            return Response(_("User added"), status=status.HTTP_200_OK)
+        return Response(_("User not in group"), status=status.HTTP_400_BAD_REQUEST)
+        
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer = self.add_creator(serializer)
@@ -366,10 +418,132 @@ class CommunityViewSet(viewsets.ModelViewSet):
         return Community.objects.all()
 # Create your views here.
 
+
+class MessagePagination(pagination.PageNumberPagination):
+    page_size = 50  # Default page size
+    page_size_query_param = 'page_size'
+    max_page_size = 100  # Limit maximum messages fetched
+
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     lookup_field = 'id'
-    permissions_classes = (permissions.IsAuthenticated,)
+    permission_classes = [permissions.IsAuthenticated,]
+    pagination_class = MessagePagination
 
-    def create():
-        pass
+
+    def _create_media_files(self, request, media_files):
+        """
+        Utility function to create media files.
+        """
+        media_instances = []
+        for file_data in media_files:
+            media = MediaMessage.objects.create(user=request.user, media_file=file_data)
+            media_instances.append(media)
+        return media_instances
+
+    @action(detail=False, methods=["post"])
+    def mark_all_as_read(self, request):
+        """
+        Marks all messages in a chatroom as read for the user.
+        """
+        room_id = request.data.get('room_id')
+        if not room_id:
+            return Response({"error": "Room ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        room = get_object_or_404(ChatRoom, id=room_id)
+        if not room.members.filter(id=request.user.id).exists():
+            return Response({"error": "You are not a member of this chatroom."}, status=status.HTTP_403_FORBIDDEN)
+
+        unread_messages = Message.objects.filter(room=room).exclude(is_read=request.user)
+        for message in unread_messages:
+            message.is_read.add(request.user)
+
+        return Response({"message": "All messages marked as read."}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["delete"])
+    def bulk_delete(self, request):
+        message_ids = request.data.get('message_ids', [])
+        messages = Message.objects.filter(id__in=message_ids, sender=request.user)
+        deleted_count = messages.delete()[0]
+
+        return Response(
+            {"message": f"{deleted_count} messages deleted successfully."},
+            status=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=["get"])
+    def analytics(self, request, pk=None):
+        room = self.get_object()
+        total_messages = room.messages.count()
+        active_users = room.members.distinct().count()
+
+        return Response({
+            "total_messages": total_messages,
+            "active_users": active_users
+        })
+
+    def create(self, request, *args, **kwargs):
+        """
+        Creates a new message in a chatroom, optionally attaching media files.
+        """
+        data = request.data
+        room = get_object_or_404(ChatRoom, id=data.get('chatroom_id'))
+        if not room.members.filter(id=request.user.id).exists():
+            return Response({"error": "You are not a member of this chatroom."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Handle media files
+        media_files = data.pop('media', [])
+        media_instances = self._create_media_files(request, media_files)
+
+        serializer = self.get_serializer(data=data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        serializer.save(room=room, sender=request.user)
+
+        # Associate media with the message
+        if media_instances:
+            serializer.instance.media.add(*media_instances)
+            serializer.instance.save()
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        """
+        Marks a message as read when a user other than the sender interacts with it.
+        """
+        message = self.get_object()
+        if request.user != message.sender:
+            message.is_read.add(request.user)
+            message.save()
+            return Response({"message": "Message marked as read."}, status=status.HTTP_200_OK)
+        return Response({"message": "Sender cannot mark their own message as read."}, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Deletes a message. Only the sender can delete their messages.
+        """
+        message = self.get_object()
+        if request.user != message.sender:
+            return Response({"error": "You are not authorized to delete this message."}, status=status.HTTP_403_FORBIDDEN)
+        self.perform_destroy(message)
+        return Response({"message": "Message deleted successfully."}, status=status.HTTP_204_NO_CONTENT)
+
+    
+
+        def get_queryset(self):
+            """
+            Retrieves messages for a user. If a `room_id` query parameter is provided,
+            it filters messages belonging to that chatroom, ensuring the user is a member.
+            """
+            room_id = self.request.query_params.get('room_id')
+            if room_id:
+                room = get_object_or_404(ChatRoom, id=room_id)
+                if not room.members.filter(id=self.request.user.id).exists():
+                    return Message.objects.none()  # User is not part of the room
+                return Message.objects.filter(room=room).order_by('-timestamp')
+            return Message.objects.filter(sender=self.request.user).order_by('-timestamp')
+
+
+
+
+
+

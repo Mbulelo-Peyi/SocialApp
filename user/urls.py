@@ -4,6 +4,7 @@ from rest_framework import routers
 router = routers.DefaultRouter()
 router.register(r'profile', views.ProfileViewSet, basename='profile')
 router.register(r'community', views.CommunityViewSet, basename='community')
+router.register(r'message', views.MessageViewSet, basename='message')
 
 urlpatterns = [
     path('api/', include(router.urls), name='api'),

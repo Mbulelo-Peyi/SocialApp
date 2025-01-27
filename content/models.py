@@ -121,8 +121,8 @@ class Reaction(models.Model):
 class Comment(models.Model):
     MOOD_TYPES = [
         ('0', 'NEGATIVE'),
-        ('1','POSITIVE'),
-        ('2','NEUTRAL'),
+        ('1','NEUTRAL'),
+        ('2','POSITIVE'),
     ]
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -153,8 +153,8 @@ class Comment(models.Model):
 class CommentReply(models.Model):
     MOOD_TYPES = [
         ('0', 'NEGATIVE'),
-        ('1','POSITIVE'),
-        ('2','NEUTRAL'),
+        ('1','NEUTRAL'),
+        ('2','POSITIVE'),
     ]
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE)
@@ -172,5 +172,11 @@ class CommentReply(models.Model):
     
     def total_dislikes(self):
         return self.dislike.all().count()
+
+class ViewedPost(models.Model):
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    viewed_count = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 # Create your models here.
