@@ -409,38 +409,6 @@ class UserPostFeedView(generics.ListAPIView):
         # 5. Clean posts to exclude banned content and order by creation date
         cleaned_queryset = cleaned_posts(request=self.request, posts=all_posts)
         return cleaned_queryset.order_by("-created_at")
-    serializer_class = PostSerializer
-    lookup_field = 'id'
-    permission_classes = [permissions.IsAuthenticated,]
+    
 
-    def get_queryset(self):
-        user = self.request.user
-        #actions
-        viewed = list(ViewedPost.objects.filter(user=user).values("post_id"))
-        viewed_ids = [x["post_id"] for x in viewed]
-        viewed_posts = Post.objects.filter(id__in=set(viewed_ids))
-        viewed_posts_moods = list(viewed_posts.values("mood"))
-        moods = [x["mood"] for x in viewed_posts_moods]
-        mood_posts = Post.objects.filter(mood__in=set(moods))
-        #relations
-        friends = list(Friendship.objects.filter(Q(sender=user, is_active=True) | Q(receiver=user, is_active=True)).select_related("sender", "receiver").values("sender_id", "receiver_id"))
-        friends_ids = set(x["sender_id"] for x in friends).union(set(x["receiver_id"] for x in friends))
-        following = list(Follower.objects.filter(Q(user=user) & Q(followed_user=user)).select_related("user", "followed_user").values("user_id", "followed_user_id"))
-        following_ids = set(x["user_id"] for x in following).union(set(x["followed_user_id"] for x in following))
-        related_ids = friends_ids.union(following_ids)
-        user_content_type = ContentType.objects.get_for_model(user)
-        user_queryset = Post.objects.filter(
-            author_content_type=user_content_type,
-            author_object_id__in=related_ids
-        )
-        communities = list(Community.objects.filter(members=user).values("id"))
-        community_ids = set(x['id'] for x in communities)
-        community_content_type = ContentType.objects.get_for_model(Community)
-        community_queryset = Post.objects.filter(
-            author_content_type=community_content_type,
-            author_object_id__in=community_ids
-        )
-        post_ids = set(x["id"] for x in list(mood_posts.values("id"))).union(set(x["id"] for x in list(user_queryset.values("id")))).union(set(x["id"] for x in list(community_queryset.values("id"))))
-        queryset = cleaned_posts(self.request,Post.objects.filter(id__in=post_ids)).order_by("-created_at")
-        return queryset
 # Create your views here.
