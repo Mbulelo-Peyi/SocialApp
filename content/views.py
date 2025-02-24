@@ -9,10 +9,11 @@ from rest_framework.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
 
 #
+from content.pagination import CommentReplyPagination, CommentPagination
 from content.serializers import *
 from content.models import *
-from content.helpers import create_media,get_tags,get_hashtags
-from content.utils import get_community_model, cleaned_posts
+from content.helpers import create_media,get_tags,get_hashtags,get_relations
+from content.utils import get_community_model, cleaned_posts,cleared_comments
 from user.models import CommunityRole, Follower, Friendship
 
 
@@ -51,47 +52,10 @@ class PostViewSet(viewsets.ModelViewSet):
             return Response(_("Post successfully deleted"), status=status.HTTP_204_NO_CONTENT)
         return Response(_("Unathorized action"), status=status.HTTP_401_UNAUTHORIZED)
 
-    @action(["post"], detail=True)
-    def create_reaction(self, request, *args, **kwargs):
-        post = self.get_object()
-        user = request.user
-        reaction_type = request.data['reaction_type']
-        reaction = Reaction.reactions.create_reaction(request, user, post, reaction_type)
-        serializer = ReactionSerializer(reaction,many=False)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-
-    @action(["post"], detail=True)
-    def update_reaction(self, request, *args, **kwargs):
-        post = self.get_object()
-        user = request.user
-        reaction = Reaction.objects.filter(user=user, post=post)
-        if user == reaction.user:
-            reaction.update(reaction_type=request.data['reaction_type'])
-            serializer = ReactionSerializer(reaction,many=False)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(_("Unauthorized action"), status=status.HTTP_401_UNAUTHORIZED)
-
-    @action(["post"], detail=True)
-    def delete_reaction(self, request, *args, **kwargs):
-        post = self.get_object()
-        user = request.user
-        reaction = Reaction.objects.filter(user=user, post=post)
-        if user == reaction.user:
-            self.perform_destroy(reaction)
-            return Response(_("Reaction successfully deleted"), status=status.HTTP_204_NO_CONTENT)
-        return Response(_("Unauthorized action"), status=status.HTTP_401_UNAUTHORIZED)
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        try:
-            media_files = data.pop('media')
-            tags = data.pop('tags')
-            hashtags = data.pop('hashtags')
-        except:
-            media_files = []
-            tags = []
-            hashtags = []
+        media_files , tags , hashtags = get_relations(data)
         files = create_media(request,media_files)
         tags = get_tags(tags)
         hashtags = get_hashtags(hashtags)
@@ -112,6 +76,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 if request.user != author:
                     raise ValidationError({"error": "You are not authorized to create posts for this user."})
                 post = Post.posts.create_post(request._request, author,data['content'],data['scheduled_time'])
+                print(files)
                 post.media.add(*files)
                 post.tags.add(*tags)
                 post.hashtags.add(*hashtags)
@@ -205,41 +170,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     lookup_field = 'id'
     permission_classes = [permissions.IsAuthenticated,]
 
-    @action(["post"], detail=True)
-    def like(self, request, *args, **kwargs):
-        comment = self.get_object()
-        if comment.like.filter(id=request.user.id).exists():
-            comment.like.remove(request.user)
-            comment.save()
-        else:
-            if comment.dislike.filter(id=request.user.id).exists():
-                comment.dislike.remove(request.user)
-            comment.like.add(request.user)
-            comment.save()
-        return Response({"like_count":comment.total_likes}, status=status.HTTP_200_OK)
-    
-    @action(["post"], detail=True)
-    def dislike(self, request, *args, **kwargs):
-        comment = self.get_object()
-        if comment.dislike.filter(id=request.user.id).exists():
-            comment.dislike.remove(request.user)
-            comment.save()
-        else:
-            if comment.like.filter(id=request.user.id).exists():
-                comment.like.remove(request.user)
-            comment.dislike.add(request.user)
-            comment.save()
-        return Response({"dislike_count":comment.total_dislikes()}, status=status.HTTP_200_OK)
 
-    @action(["get"], detail=True)
-    def like_count(self, request, *args, **kwargs):
-        comment = self.get_object()
-        return Response({"like_count":comment.total_likes()}, status=status.HTTP_200_OK)
-    
-    @action(["get"], detail=True)
-    def dislike_count(self, request, *args, **kwargs):
-        comment = self.get_object()
-        return Response({"dislike_count":comment.total_dislikes()}, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
         data = request.data
@@ -247,7 +178,8 @@ class CommentViewSet(viewsets.ModelViewSet):
         post = get_object_or_404(Post, id=post_id)
         user = request.user
         content = data['content']
-        comment = Comment.comments.create_comment(request, user, post, content)
+        comment = Comment.comments.create_comment(request._request, user, post, content)
+        comment.save()
         serializer = CommentSerializer(comment,many=False, context={'request': request})
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
@@ -284,52 +216,12 @@ class CommentViewSet(viewsets.ModelViewSet):
 class CommentReplyViewSet(viewsets.ModelViewSet):
     serializer_class = CommentReplySerializer
     lookup_field = 'id'
-    queryset = CommentReply.objects.all()
     permission_classes = [permissions.IsAuthenticated,]
 
-    @action(["post"], detail=True)
-    def like(self, request, *args, **kwargs):
-        comment_reply = self.get_object()
-        if comment_reply.like.filter(id=request.user.id).exists():
-            comment_reply.like.remove(request.user)
-            comment_reply.save()
-        else:
-            if comment_reply.dislike.filter(id=request.user.id).exists():
-                comment_reply.dislike.remove(request.user)
-            comment_reply.like.add(request.user)
-            comment_reply.save()
-        return Response({"like_count":comment_reply.total_likes()}, status=status.HTTP_200_OK)
-    
-    @action(["post"], detail=True)
-    def dislike(self, request, *args, **kwargs):
-        comment_reply = self.get_object()
-        if comment_reply.dislike.filter(id=request.user.id).exists():
-            comment_reply.dislike.remove(request.user)
-            comment_reply.save()
-        else:
-            if comment_reply.like.filter(id=request.user.id).exists():
-                comment_reply.like.remove(request.user)
-            comment_reply.dislike.add(request.user)
-            comment_reply.save()
-        return Response({"dislike_count":comment_reply.total_dislikes()}, status=status.HTTP_200_OK)
-
-    @action(["get"], detail=True)
-    def like_count(self, request, *args, **kwargs):
-        comment_reply = self.get_object()
-        return Response({"like_count":comment_reply.total_likes()}, status=status.HTTP_200_OK)
-    
-    @action(["get"], detail=True)
-    def dislike_count(self, request, *args, **kwargs):
-        comment_reply = self.get_object()
-        return Response({"dislike_count":comment_reply.total_dislikes()}, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        comment_id = data.pop('comment_id')
-        comment = get_object_or_404(Comment, id=comment_id)
         serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.initial_data['user'] = request.user
-        serializer.initial_data['comment'] = comment
         if serializer.is_valid(raise_exception=True):
             self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
@@ -361,6 +253,13 @@ class CommentReplyViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(comment=comment)
             return queryset
         return queryset
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            self.serializer_class = CommentReplyPreocessingSerializer
+        else:
+            self.serializer_class = CommentReplySerializer
+        return super(CommentReplyViewSet, self).get_serializer_class()
 
 class UserPostFeedView(generics.ListAPIView):
     serializer_class = PostSerializer
@@ -409,6 +308,186 @@ class UserPostFeedView(generics.ListAPIView):
         # 5. Clean posts to exclude banned content and order by creation date
         cleaned_queryset = cleaned_posts(request=self.request, posts=all_posts)
         return cleaned_queryset.order_by("-created_at")
+  
+class PostListDetailViewSet(viewsets.ReadOnlyModelViewSet, generics.CreateAPIView):
+    serializer_class = PostSerializer
+    lookup_field = 'id'
+    permission_classes = [permissions.IsAuthenticated,]
     
+    @action(["get"], detail=True)
+    def check_reaction(self, request, *args, **kwargs):
+        post = self.get_object()
+        user = request.user
+        reaction = Reaction.objects.filter(user=user, post=post)
+        if reaction.exists():
+            serializer = ReactionSerializer(reaction.first(), context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(_("Not found"), status=status.HTTP_404_NOT_FOUND)
+
+    @action(["get"], detail=True)
+    def reaction_count(self, request, *args, **kwargs):
+        post = self.get_object()
+        reactions = Reaction.objects.filter(post=post)
+        return Response({"reaction_count":reactions.count()}, status=status.HTTP_200_OK)
+
+    @action(["get"], detail=True)
+    def comment_count(self, request, *args, **kwargs):
+        post = self.get_object()
+        comments = Comment.objects.filter(post=post)
+        return Response({"comment_count":comments.count()}, status=status.HTTP_200_OK)
+
+    @action(["get"], detail=True)
+    def share_count(self, request, *args, **kwargs):
+        post = self.get_object()
+        return Response({"share_count":post.share_count}, status=status.HTTP_200_OK)
+
+    @action(["post"], detail=True)
+    def reaction(self, request, *args, **kwargs):
+        post = self.get_object()
+        user = request.user
+        reaction_type = request.data['reaction_type']
+        reaction = Reaction.objects.filter(user=user, post=post)
+        if reaction.exists():
+            reaction.update(reaction_type=reaction_type)
+            serializer = ReactionSerializer(reaction,many=False, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        reaction = Reaction.reactions.create_reaction(request._request, user, post, reaction_type)
+        serializer = ReactionSerializer(reaction,many=False, context={'request': request})
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @action(["post"], detail=True)
+    def delete_reaction(self, request, *args, **kwargs):
+        post = self.get_object()
+        user = request.user
+        reaction = Reaction.objects.filter(user=user, post=post)
+        if reaction.exists():
+            reaction.first().delete()
+            return Response(_("Reaction successfully deleted"), status=status.HTTP_204_NO_CONTENT)
+        return Response(_("Unauthorized action"), status=status.HTTP_401_UNAUTHORIZED)
+    
+    @action(["post"], detail=True)
+    def share_post(self, request, *args, **kwargs):
+        post = self.get_object()
+        if post.share.filter(id=request.user.id).exists():
+            post.share.remove(request.user)
+            post.save()
+        else:
+            post.share.add(request.user)
+            post.save()
+        serializer = self.get_serializer(post, many=False, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+    def get_queryset(self):
+        all_posts = Post.objects.all()
+        cleaned_queryset = cleaned_posts(request=self.request, posts=all_posts)
+        return cleaned_queryset.order_by("-created_at")
+
+class CommentListDetailViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = CommentSerializer
+    lookup_field = 'id'
+    permission_classes = [permissions.IsAuthenticated,]
+    pagination_class = CommentPagination
+
+    @action(["post"], detail=True)
+    def like(self, request, *args, **kwargs):
+        comment = self.get_object()
+        if comment.like.filter(id=request.user.id).exists():
+            comment.like.remove(request.user)
+            comment.save()
+        else:
+            if comment.dislike.filter(id=request.user.id).exists():
+                comment.dislike.remove(request.user)
+            comment.like.add(request.user)
+            comment.save()
+        return Response({"like_count":comment.total_likes}, status=status.HTTP_200_OK)
+    
+    @action(["post"], detail=True)
+    def dislike(self, request, *args, **kwargs):
+        comment = self.get_object()
+        if comment.dislike.filter(id=request.user.id).exists():
+            comment.dislike.remove(request.user)
+            comment.save()
+        else:
+            if comment.like.filter(id=request.user.id).exists():
+                comment.like.remove(request.user)
+            comment.dislike.add(request.user)
+            comment.save()
+        return Response({"dislike_count":comment.total_dislikes()}, status=status.HTTP_200_OK)
+
+    @action(["get"], detail=True)
+    def like_count(self, request, *args, **kwargs):
+        comment = self.get_object()
+        return Response({"like_count":comment.total_likes()}, status=status.HTTP_200_OK)
+    
+    @action(["get"], detail=True)
+    def dislike_count(self, request, *args, **kwargs):
+        comment = self.get_object()
+        return Response({"dislike_count":comment.total_dislikes()}, status=status.HTTP_200_OK)
+
+    
+    def get_queryset(self):
+        comments = Comment.objects.all()
+        post_id = self.request.query_params.get('post_id')
+        if post_id:
+            comments = comments.filter(post=post_id)
+            cleaned_queryset = cleared_comments(request=self.request, comments=comments)
+            return cleaned_queryset.order_by("-created_at")
+        cleaned_queryset = cleared_comments(request=self.request, comments=comments)
+        return cleaned_queryset.order_by("-created_at")
+
+
+class CommentReplyListDetailViewSet(viewsets.ModelViewSet):
+    serializer_class = CommentReplySerializer
+    lookup_field = 'id'
+    permission_classes = [permissions.IsAuthenticated,]
+    pagination_class = CommentReplyPagination
+
+    @action(["post"], detail=True)
+    def like(self, request, *args, **kwargs):
+        comment_reply = self.get_object()
+        if comment_reply.like.filter(id=request.user.id).exists():
+            comment_reply.like.remove(request.user)
+            comment_reply.save()
+        else:
+            if comment_reply.dislike.filter(id=request.user.id).exists():
+                comment_reply.dislike.remove(request.user)
+            comment_reply.like.add(request.user)
+            comment_reply.save()
+        return Response({"like_count":comment_reply.total_likes()}, status=status.HTTP_200_OK)
+    
+    @action(["post"], detail=True)
+    def dislike(self, request, *args, **kwargs):
+        comment_reply = self.get_object()
+        if comment_reply.dislike.filter(id=request.user.id).exists():
+            comment_reply.dislike.remove(request.user)
+            comment_reply.save()
+        else:
+            if comment_reply.like.filter(id=request.user.id).exists():
+                comment_reply.like.remove(request.user)
+            comment_reply.dislike.add(request.user)
+            comment_reply.save()
+        return Response({"dislike_count":comment_reply.total_dislikes()}, status=status.HTTP_200_OK)
+
+    @action(["get"], detail=True)
+    def like_count(self, request, *args, **kwargs):
+        comment_reply = self.get_object()
+        return Response({"like_count":comment_reply.total_likes()}, status=status.HTTP_200_OK)
+    
+    @action(["get"], detail=True)
+    def dislike_count(self, request, *args, **kwargs):
+        comment_reply = self.get_object()
+        return Response({"dislike_count":comment_reply.total_dislikes()}, status=status.HTTP_200_OK)
+
+    
+    def get_queryset(self):
+        queryset = CommentReply.objects.all()
+        comment_id = self.request.query_params.get('comment_id')
+        if comment_id:
+            comment = get_object_or_404(Comment, id=comment_id)
+            queryset = queryset.filter(comment=comment)
+            return queryset
+        return queryset
 
 # Create your views here.

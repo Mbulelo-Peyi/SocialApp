@@ -12,6 +12,7 @@ class PostFile(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     media_file = models.FileField(upload_to='post_media/')
     blur = models.BooleanField(default=False)
+    mime_type = models.CharField(max_length=20,blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
 class Tag(models.Model):
@@ -47,6 +48,7 @@ class Post(models.Model):
     mood = models.CharField(max_length=20, choices=MOOD_TYPES, default="2")
     media = models.ManyToManyField(PostFile, blank=True)
     post_type = models.CharField(max_length=20, choices=POST_TYPES, default=TEXT)
+    share = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="shared_users")
     tags = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="tagged_users")
     hashtags = models.ManyToManyField(Tag, blank=True)
     scheduled_time = models.DateTimeField(blank=True, null=True)
@@ -72,6 +74,10 @@ class Post(models.Model):
         "adult_rated": false
     }
     '''
+
+    @property
+    def share_count(self):
+        return self.share.count()
 
     def __str__(self):
         return f"{self.author} - {self.content[:10]}" 

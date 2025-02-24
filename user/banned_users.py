@@ -6,12 +6,9 @@ def get_banned(request):
 
 
 def get_cleared(request, data:Profile):
-    banned_profiles = list(get_banned(request))
-    cleared_profiles = []
-    for i in data:
-        if i not in banned_profiles and i not in cleared_profiles:
-            cleared_profiles.append(i)
-    cleared_ids = set([each.id for each in cleared_profiles])
-    profiles = Profile.objects.filter(id__in=cleared_ids)
-    return profiles
+    banned_profiles = get_banned(request)
+    banned_user_ids = banned_profiles.values_list('id', flat=True)
+    data.exclude(id=request.user.id)
+    return data.exclude(id__in=banned_user_ids)
+
 

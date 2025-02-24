@@ -93,3 +93,10 @@ class CommentReplySerializer(serializers.ModelSerializer):
         model = CommentReply
         fields = "__all__"
 
+class CommentReplyPreocessingSerializer(serializers.ModelSerializer):
+    like = ProfileSerializer(required=False, many=True)
+    dislike = ProfileSerializer(required=False, many=True)
+
+    class Meta:
+        model = CommentReply
+        fields = "__all__"

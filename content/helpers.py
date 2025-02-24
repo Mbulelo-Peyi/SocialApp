@@ -1,23 +1,22 @@
 from django.contrib.auth import get_user_model
 
 from content.serializers import PostFileSerializer
-from content.models import Tag
+from content.models import Tag,PostFile
 Profile = get_user_model()
 
 
 
-def add_user(request, serializer):
-        serializer.initial_data['user'] = request.user
-        return serializer
 
 def create_media(request, media_files:list):
     file_list = []
-    for media in media_files:
-        serializer = PostFileSerializer(data=media, context={'request': request})
-        serializer = add_user(request, serializer)
-        if serializer.is_valid(raise_exception=True):
-            serializer.save()
-            file_list.append(serializer.instance)
+    if len(media_files) > 0:
+        for media in media_files:
+            post_file = PostFile.objects.create(
+                user = request.user,
+                media_file = media
+            )
+            post_file.save()
+            file_list.append(post_file)
     return file_list
 
 def get_tags(tags:list):
@@ -39,3 +38,19 @@ def get_hashtags(tags:list):
         except Exception as e:
             raise e
     return tag_list
+
+
+def get_relations(data):
+    try:
+        media_files = data.pop('media')
+    except:
+        media_files = []
+    try:
+        tags = data.pop('tags')
+    except:
+        tags = []
+    try:
+        hashtags = data.pop('hashtags')
+    except:
+        hashtags = []
+    return media_files, tags, hashtags
