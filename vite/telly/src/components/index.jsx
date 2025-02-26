@@ -18,6 +18,8 @@ import CommentReplyOptions from './CommentReplyOptions';
 import CommentReplyButtons from './CommentReplyButtons';
 import Reactions from './Reactions';
 import ShareButton from './ShareButton';
+import FollowersCard from './FollowersCard';
+import CommunityCard from './CommunityCard';
 
 
 export{
@@ -39,6 +41,8 @@ export{
     CommentReplyButtons,
     Reactions,
     ShareButton,
+    FollowersCard,
+    CommunityCard,
     useAxios,
     AuthContext,
 }

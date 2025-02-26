@@ -74,7 +74,6 @@ const PostList = () => {
                     </React.Fragment>
                     {(hasNextPage || isFetchingNextPage) && (
                         <div className="flex flex-col items-center justify-center">
-                            {/* <img className="h-24 w-24" src={LoadingResults} alt="loading-icon" /> */}
                             <div ref={ref} className="h-1"></div>
                         </div>
                     )}

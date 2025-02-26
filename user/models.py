@@ -156,12 +156,21 @@ class Profile(AbstractBaseUser,PermissionsMixin):
         return round((datetime.date.today() - self.birthday)//datetime.timedelta(days=365))
 
 class Follower(models.Model):
+    slug = models.SlugField(unique=True, max_length=255, blank=True, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='followers')
     followed_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='following')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.user} follows {self.followed_user}"
+    
+    def save(self, *args, **kwargs):
+        if self.slug != "":
+            pass
+        else:
+            self.slug = signing.dumps({'id': random.SystemRandom.random(self.id)})
+            self.slug = self.slug.replace(":","-")
+        super().save(*args, **kwargs)
 
 class Friendship(models.Model):
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='friendship_sender')
@@ -184,6 +193,10 @@ class Community(models.Model):
 
     def __str__(self):
         return self.name
+    
+    @property
+    def members_count(self):
+        return self.members.count()
 
 class ChatRoom(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)

@@ -78,53 +78,89 @@ class ProfileViewSet(viewsets.ModelViewSet):
     @action(["post"], detail=True)
     def send_friend_request(self, request, *args, **kwargs):
         receiver = self.get_object()
-        friend_request = Friendship.objects.create(sender=request.user,receiver=receiver)
-        serializer = FriendshipSerializer(friend_request, many=False, context={'request': request})
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        friend_request, created = Friendship.objects.get_or_create(sender=request.user,receiver=receiver)
+        if created:
+            serializer = FriendshipSerializer(friend_request, many=False, context={'request': request})
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        self.perform_destroy(friend_request)
+        return Response("No content", status=status.HTTP_204_NO_CONTENT)
+        
 
     @action(["get"], detail=False)
     def friend_requests(self, request, *args, **kwargs):
-        friend_requests = Friendship.objects.filter(receiver=request.user, is_active=False)
-        serializer = FriendshipSerializer(friend_requests, many=True, context={'request': request})
+        friend_requests_ids = Friendship.objects.filter(receiver=request.user, is_active=False).values_list("sender_id", flat=True)
+        friend_requests = Profile.objects.filter(id__in=friend_requests_ids)
+        friend_requests = get_cleared(request,friend_requests)
+        page = self.paginate_queryset(friend_requests)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(friend_requests, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(["get"], detail=False)
     def sent_friend_requests(self, request, *args, **kwargs):
-        friend_requests = Friendship.objects.filter(sender=request.user, is_active=False)
-        serializer = FriendshipSerializer(friend_requests, many=True, context={'request': request})
+        friend_requests_ids = Friendship.objects.filter(sender=request.user, is_active=False).values_list("receiver_id", flat=True)
+        friend_requests = Profile.objects.filter(id__in=friend_requests_ids)
+        friend_requests = get_cleared(request,friend_requests)
+        page = self.paginate_queryset(friend_requests)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(friend_requests, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(["post"], detail=False)
+    @action(["post"], detail=True)
     def accept_friend_request(self, request, *args, **kwargs):
-        data = request.data
-        friend_request = get_object_or_404(Friendship,id=data['id'], receiver=request.user, is_active=False)
+        user = self.get_object()
+        friend_request = get_object_or_404(Friendship, sender=user, receiver=request.user, is_active=False)
         friend_request.is_active = True
         friend_request.save()
         serializer = FriendshipSerializer(friend_request, many=False, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(["get"], detail=True)
-    def friendlist(self, request, *args, **kwargs):
-        me = request.user
+    @action(["post"], detail=True)
+    def reject_friend_request(self, request, *args, **kwargs):
         user = self.get_object()
-        friendship_status0 = Friendship.objects.filter(sender=user,receiver=me, is_active=True)
-        friendship_status1 = Friendship.objects.filter(sender=me,receiver=user, is_active=True)
-        if friendship_status0.exists() or friendship_status1.exists():
-            friends = Friendship.objects.filter(
-                Q(sender=user, is_active=True) | Q(receiver=user, is_active=True)
-            ).select_related("sender", "receiver")
-            serializer = FriendshipSerializer(friends, many=True, context={'request': request})
+        friend_request = get_object_or_404(Friendship, sender=user, receiver=request.user, is_active=False)
+        friend_request.delete()
+        return Response("No content", status=status.HTTP_204_NO_CONTENT)
+
+    @action(["get"], detail=True)
+    def friendslist(self, request, *args, **kwargs):
+        user = self.get_object()
+        friends_ids = Friendship.objects.filter(
+            Q(sender=user, is_active=True) | Q(receiver=user, is_active=True)
+        ).select_related("sender", "receiver").values("sender_id", "receiver_id").values_list(flat=True)
+        friends_status = Friendship.objects.filter(
+            Q(sender=user, receiver=request.user, is_active=True) | Q(receiver=user, sender=request.user, is_active=True)
+        ).select_related("sender", "receiver")
+        if friends_status.exists():
+            friends = Profile.objects.filter(id__in=set(friends_ids))
+            friends = get_cleared(request,friends)
+            friends.exclude(id=user.id)
+            page = self.paginate_queryset(friends)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True, context={'request': request})
+                return self.get_paginated_response(serializer.data)
+            serializer = self.get_serializer(friends, many=True, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(_("Unauthorized action"), status=status.HTTP_401_UNAUTHORIZED)
+        return Response("Unauthorized action", status=status.HTTP_401_UNAUTHORIZED)
     
     @action(["get"], detail=False)
     def my_friends(self, request, *args, **kwargs):
         user = request.user
-        friends = Friendship.objects.filter(
+        friends_ids = Friendship.objects.filter(
             Q(sender=user, is_active=True) | Q(receiver=user, is_active=True)
-        ).select_related("sender", "receiver")
-        serializer = FriendshipSerializer(friends, many=True, context={'request': request})
+        ).select_related("sender", "receiver").values("sender_id", "receiver_id").values_list(flat=True)
+        friends = Profile.objects.filter(id__in=set(friends_ids))
+        friends = get_cleared(request,friends)
+        page = self.paginate_queryset(friends)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(friends, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(["get"], detail=True)
@@ -162,22 +198,38 @@ class ProfileViewSet(viewsets.ModelViewSet):
     def follow(self, request, *args, **kwargs):
         me = request.user
         user = self.get_object()
-        follow = Follower.objects.create(user=me, followed_user=user)
-        serializer = FollowerSerializer(follow, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        follow, created = Follower.objects.get_or_create(user=me, followed_user=user)
+        if created:
+            serializer = FollowerSerializer(follow, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        self.perform_destroy(follow)
+        return Response("No Content", status=status.HTTP_204_NO_CONTENT)
+        
 
     @action(["get"], detail=True)
     def followers(self, request, *args, **kwargs):
         user = self.get_object()
-        followers = Follower.objects.filter(followed_user=user)
-        serializer = FollowerSerializer(followers, many=True, context={'request': request})
+        followers_ids = Follower.objects.filter(followed_user=user).values_list('user', flat=True)
+        followers = Profile.objects.filter(id__in=followers_ids)
+        followers = get_cleared(request,followers)
+        page = self.paginate_queryset(followers)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(followers, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     @action(["get"], detail=True)
     def following(self, request, *args, **kwargs):
         user = self.get_object()
-        following = Follower.objects.filter(user=user)
-        serializer = FollowerSerializer(following, many=True, context={'request': request})
+        following_ids = Follower.objects.filter(user=user).values_list('followed_user', flat=True)
+        following = Profile.objects.filter(id__in=following_ids)
+        following = get_cleared(request,following)
+        page = self.paginate_queryset(following)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(following, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):

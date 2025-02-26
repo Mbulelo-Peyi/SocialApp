@@ -22,9 +22,25 @@ from user.models import(
 Profile = get_user_model()
 Community = get_community_model()
 
+class ProfilePictureSerializer(serializers.ModelSerializer):
+    # user = ProfileSerializer(read_only=True)
+
+    class Meta:
+        model = ProfilePicture
+        fields = ["id", "user", "picture", "is_active", "uploaded_at"]  # Explicit fields
+        read_only_fields = ["id", "uploaded_at"]
+
+    def to_representation(self, instance):
+        request = self.context.get('request')
+        data = super().to_representation(instance)
+        if request:
+            data["picture_url"] = request.build_absolute_uri(instance.picture.url) if instance.picture else None
+        return data
+
 class AdminProfileSerializer(serializers.ModelSerializer):
     country = CountryField(required=False)
     image = serializers.ImageField(required=False)
+    profile_pic = ProfilePictureSerializer(required=False, many=True)
     class Meta:
         model = Profile
         fields = "__all__"
@@ -33,9 +49,10 @@ class AdminProfileSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     country = CountryField(required=False)
     image = serializers.ImageField(required=False)
+    profile_pic = ProfilePictureSerializer(required=False, many=True)
     class Meta:
         model = Profile
-        fields = ['id','email', 'username', 'password', 'birthday', 'sex', 'image', 'country']
+        fields = ['id','email', 'username', 'profile_pic', 'password', 'birthday', 'sex', 'image', 'country']
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
@@ -55,20 +72,6 @@ class ProfileProcessingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = ['id','email', 'username', 'birthday', 'sex', 'address', 'postal_code', 'image', 'country']
-
-class ProfilePictureSerializer(serializers.ModelSerializer):
-    user = ProfileSerializer(read_only=True)
-
-    class Meta:
-        model = ProfilePicture
-        fields = ["id", "user", "picture", "is_active", "uploaded_at"]  # Explicit fields
-        read_only_fields = ["id", "uploaded_at"]
-
-    def to_representation(self, instance):
-        request = self.context.get('request')
-        data = super().to_representation(instance)
-        data["picture_url"] = request.build_absolute_uri(instance.picture.url) if instance.picture else None
-        return data
 
 
 class CustomPasswordChangeSerializer(serializers.Serializer):
@@ -134,6 +137,11 @@ class CommunitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Community
         fields = "__all__"
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["members_count"] = instance.members_count
+        return data
 
 class ChatRoomSerializer(serializers.ModelSerializer):
     community = CommunitySerializer(read_only=True)

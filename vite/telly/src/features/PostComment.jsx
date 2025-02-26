@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAxios } from "./index";
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const PostComment = ({ post }) => {
     const [commentText, setCommentText] = useState("");
     const api = useAxios();
+    const navigate = useNavigate();
     const queryClient = useQueryClient();
     const fetchInterval = 1000*60*10;
 
@@ -19,9 +20,9 @@ const PostComment = ({ post }) => {
     const commentMutation = useMutation({
         mutationFn: (variables)=> postComment(variables),
         onSuccess : ()=> {
-            setShowComments(prev=>!prev)
             queryClient.invalidateQueries(['comment', post?.id]);
             queryClient.invalidateQueries(['comment-count', post?.id]);
+            navigate(`/post/${post?.id}/`);
         },
     })
 
@@ -76,7 +77,7 @@ const PostComment = ({ post }) => {
     return (
         <div className="flex">
             <button className="text-gray-600 hover:text-gray-800">
-                <Link to={`/post/${post?.id}`}><span>💬 {commentCountQuery.data?.comment_count}</span></Link>
+                <Link to={`/post/${post?.id}/`}><span>💬 {commentCountQuery.data?.comment_count}</span></Link>
             </button>
             <form onSubmit={handleCommentSubmit} className="mt-4 flex items-baseline max-sm:hidden">
                 <input

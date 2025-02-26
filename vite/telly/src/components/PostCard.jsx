@@ -47,16 +47,7 @@ const PostCard = ({ post }) => {
                 <div className="bg-white md:p-4 rounded-lg shadow-lg w-full">
                     {/* Post Actions */}
                     <div className="flex justify-between items-center space-x-4 mt-4">
-                        {/* <button className="text-blue-500 hover:text-blue-700">
-                            👍 100 Like
-                        </button> */}
                         <Reactions postQuery={post} />
-                        {/* <button className="text-gray-600 hover:text-gray-800">
-                            💬 100 Comments
-                        </button> */}
-                        {/* <button className="text-green-500 hover:text-green-700">
-                            🔗 100 Share
-                        </button> */}
                         <PostComment post={post} />
                         <ShareButton postQuery={post} />
                     </div>

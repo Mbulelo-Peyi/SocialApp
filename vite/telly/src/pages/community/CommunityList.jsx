@@ -1,12 +1,10 @@
-import React, { useRef, useState, useEffect, useContext } from 'react';
-import { useAxios, AuthContext, FollowersCard } from '../../components/index';
+import React, { useState, useRef, useEffect } from 'react';
+import { useAxios, CommunityCard } from '../../components/index';
 import { useIntersection } from '@mantine/hooks';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-const FollowersList = () => {
-    const { user } = useContext(AuthContext);
-    const [type, setType] = useState("followers");
-    const [search, setSearch] = useState('');
+const CommunityList = () => {
+    const [search, setSearch] = useState("");
     const queryClient = useQueryClient();
     const api = useAxios();
     const targetRef = useRef();
@@ -15,7 +13,13 @@ const FollowersList = () => {
         threshold: 0.1,
     });
     const isInViewport = entry?.isIntersecting;
-    const follow = true
+
+    const communitiesMutation = useMutation({
+        mutationFn: (variables)=> communitiesFunc(variables),
+        onSuccess : ()=> {
+            queryClient.invalidateQueries(['communities', 'infinite']);
+        },
+    });
     
     const {
         data,
@@ -24,7 +28,7 @@ const FollowersList = () => {
         isFetchingNextPage,
         isLoading,
     } = useInfiniteQuery({
-        queryKey:['followers', 'infinite'],
+        queryKey:['friends', 'infinite'],
         getNextPageParam: (lastPage) => {
             try {
                 const nextPage = lastPage?.next ? lastPage?.next.split('page=')[1] : null;
@@ -35,14 +39,6 @@ const FollowersList = () => {
         },
         queryFn: (pageParam)=> getData(pageParam),
 
-    });
-
-    
-    const followersMutation = useMutation({
-        mutationFn: (variables)=> followersFunc(variables),
-        onSuccess : ()=> {
-            queryClient.invalidateQueries(['followers', 'infinite']);
-        },
     });
 
     useEffect(()=>{
@@ -59,7 +55,7 @@ const FollowersList = () => {
         };
         try {
             const response = await api.get(
-                `/user/api/profile/${user?.id}/${type}/?page=${pageParam}`,
+                `/user/api/community/?page=${pageParam}`,
                 config
             );
             return response.data;
@@ -68,50 +64,45 @@ const FollowersList = () => {
         }
     };
 
-    const followers = data?.pages.flatMap(page => page?.results);
-
-    const followersFunc = (value) =>{
-        setType(value)
-        return followers
-    };
+    const communities = data?.pages.flatMap(page => page?.results);
 
     return (
         <div className="bg-white p-4 rounded-lg shadow-md">
-            <h3 className="text-xl font-semibold mb-4">Followers</h3>
+            <h3 className="text-xl font-semibold mb-4">Communities</h3>
 
             {/* Search Bar */}
             <input
                 type="text"
-                placeholder="Search followers..."
+                placeholder="Search community..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="mb-4 p-2 border rounded w-full"
             />
             <div className="flex justify-center items-center py-4 w-full space-x-0">
                 <button
-                onClick={()=>followersMutation.mutate("followers")} 
-                className={`w-1/2 text-center ${type==="followers"?"bg-blue-200":"bg-gray-300 text-gray-700"}`} 
-                disabled={followersMutation.isPending}>
-                    <span className={`text-lg font-semibold leading-none ${type==="followers"?"text-blue-700":"text-gray-700"} `}>followers</span>
-                    <hr className={`w-full h-1 py-1 ${type==="followers"?"bg-blue-700":"bg-gray-700 "}`}/>
+                onClick={()=>communitiesMutation.mutate("communities")} 
+                className={`w-1/2 text-center ${type==="communities"?"bg-blue-200":"bg-gray-300 text-gray-700"}`} 
+                disabled={communitiesMutation.isPending}>
+                    <span className={`text-lg font-semibold leading-none ${type==="communities"?"text-blue-700":"text-gray-700"} `}>communities</span>
+                    <hr className={`w-full h-1 py-1 ${type==="communities"?"bg-blue-700":"bg-gray-700 "}`}/>
                 </button>
                 <button 
-                onClick={()=>followersMutation.mutate("following")} 
-                className={`w-1/2 text-center ${type==="following"?"bg-blue-200":"bg-gray-300 text-gray-700 "}`} 
-                disabled={followersMutation.isPending}>
-                    <span className={`text-lg font-semibold leading-none ${type==="following"?"text-blue-700":"text-gray-700"} `}>following</span>
-                    <hr className={`w-full h-1 py-1 ${type==="following"?"bg-blue-700":"bg-gray-700 "}`}/>
+                onClick={()=>communitiesMutation.mutate("joined")} 
+                className={`w-1/2 text-center ${type==="joined"?"bg-blue-200":"bg-gray-300 text-gray-700 "}`} 
+                disabled={communitiesMutation.isPending}>
+                    <span className={`text-lg font-semibold leading-none ${type==="joined"?"text-blue-700":"text-gray-700"} `}>joined Communities</span>
+                    <hr className={`w-full h-1 py-1 ${type==="joined"?"bg-blue-700":"bg-gray-700 "}`}/>
                 </button>
             </div>
-            {/* Followers List */}
+            {/* Communities List */}
             {!isLoading && (
                 <React.Fragment>
-                    {!isLoading && followers?.length === 0 ? (
-                        <p className="text-gray-500">No followers found.</p>
+                    {!isLoading && communities?.length === 0 ? (
+                        <p className="text-gray-500">No communities found.</p>
                     ) : (
                         <ul className="space-y-4">
-                            {followers?.map((relation) => (
-                                <FollowersCard key={relation?.id} relation={relation} follow={follow} type={type} />
+                            {communities?.map((community) => (
+                                <CommunityCard key={community?.id} community={community} />
                             ))}
                             {(hasNextPage || isFetchingNextPage) && (
                                 <div className="flex flex-col items-center justify-center">
@@ -124,7 +115,7 @@ const FollowersList = () => {
             )}
             
         </div>
-    );
-};
+    )
+}
 
-export default FollowersList;
+export default CommunityList
