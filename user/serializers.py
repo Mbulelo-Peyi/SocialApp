@@ -200,8 +200,9 @@ class CommunityRuleSerializer(serializers.ModelSerializer):
 
 class EventSerializer(serializers.ModelSerializer):
     community = CommunitySerializer(read_only=True)
+    attendees = ProfileSerializer(required=False, many=True)
 
     class Meta:
         model = Event
-        fields = "__all__"
+        fields = ["id", "community", "attendees", "title", "description", "venue", "date", "created_at", "timesince"]
 

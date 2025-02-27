@@ -20,6 +20,7 @@ import Reactions from './Reactions';
 import ShareButton from './ShareButton';
 import FollowersCard from './FollowersCard';
 import CommunityCard from './CommunityCard';
+import CommunityHeader from './CommunityHeader';
 
 
 export{
@@ -43,6 +44,7 @@ export{
     ShareButton,
     FollowersCard,
     CommunityCard,
+    CommunityHeader,
     useAxios,
     AuthContext,
 }

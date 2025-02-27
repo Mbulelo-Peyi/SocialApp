@@ -26,6 +26,7 @@ from user.banned_users import get_cleared
 
 class ProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileSerializer
+    search_fields = ('id', 'username',)
     lookup_field = 'id'
     permissions_classes = (permissions.IsAuthenticated,)
 
@@ -331,6 +332,7 @@ class MyTokenObtainPairView(TokenObtainPairView):
 
 class CommunityViewSet(viewsets.ModelViewSet):
     serializer_class = CommunitySerializer
+    search_fields = ('id', 'name', 'description', 'created_by__username',)
     lookup_field = 'id'
     permissions_classes = (permissions.IsAuthenticated,)
 
@@ -344,7 +346,14 @@ class CommunityViewSet(viewsets.ModelViewSet):
             return serializer
         except Profile.DoesNotExist():
             return serializer
-    
+
+    @action(["get"], detail=True)
+    def check_role(self, request, *args, **kwargs):
+        community = self.get_object()
+        role = CommunityRole.objects.filter(community=community,user=request.user)
+        if role.exists():
+            return Response({"role":role.first().role}, status=status.HTTP_200_OK)
+        return Response({"role":"None"}, status=status.HTTP_200_OK)
 
     @action(["post"], detail=True)
     def add_member(self, request, *args, **kwargs):
@@ -397,6 +406,31 @@ class CommunityViewSet(viewsets.ModelViewSet):
         serializer = MembershipRequestSerializer(community_requests, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(["get"], detail=True)
+    def community_members(self, request, *args, **kwargs):
+        community = self.get_object()
+        if community.is_private and not community.members.filter(id=request.user.id):
+            return Response("No content", status=status.HTTP_204_NO_CONTENT)
+        members = get_cleared(request,community.members.all())
+        page = self.paginate_queryset(members)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(members, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(["get"], detail=False)
+    def joined_communities(self, request, *args, **kwargs):
+        user = request.user
+        communities = Community.objects.filter(members=user)
+        communities = self.filter_queryset(communities)
+        page = self.paginate_queryset(communities)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(communities, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     @action(["post"], detail=True)
     def group_chat_add(self, request, *args, **kwargs):
         community = self.get_object()
@@ -437,6 +471,25 @@ class CommunityViewSet(viewsets.ModelViewSet):
             return Response(_("User added"), status=status.HTTP_200_OK)
         return Response(_("User not in group"), status=status.HTTP_400_BAD_REQUEST)
         
+    @action(["get"], detail=True)
+    def community_events(self, request, *args, **kwargs):
+        community = self.get_object()
+        events = Event.objects.filter(community=community)
+        events = self.filter_queryset(events)
+        page = self.paginate_queryset(events)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(events, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(["get"], detail=True)
+    def community_event(self, request, *args, **kwargs):
+        community = self.get_object()
+        event = get_object_or_404(Event,id=self.request.query_params.get('event_id'),community=community)
+        serializer = self.get_serializer(event, many=False, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
@@ -468,8 +521,91 @@ class CommunityViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Community.objects.all()
+    
+    
+    def get_serializer_class(self):
+        if self.action == "community_members":
+            self.serializer_class = AdminProfileSerializer
+            if self.request.user.is_staff:
+                self.serializer_class = AdminProfileSerializer
+            else:
+                self.serializer_class = ProfileSerializer
+        elif self.action == "community_events" or self.action == "community_event":
+            self.serializer_class = EventSerializer
+        else:
+            self.serializer_class = CommunitySerializer
+        return super(CommunityViewSet, self).get_serializer_class()
 # Create your views here.
 
+class FollowersListView(generics.ListAPIView):
+    serializer_class = ProfileSerializer
+    search_fields = ('id', 'username',)
+    lookup_field = 'id'
+    permissions_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        query_params = self.request.query_params.get('query_params')
+        query_params_id = self.request.query_params.get('query_params_id')
+        if query_params_id:
+            user = get_object_or_404(Profile, id=query_params_id)
+        else:
+            user = self.request.user
+        if query_params == "followers":
+            followers_ids = Follower.objects.filter(followed_user=user).values_list('user', flat=True)
+            followers = Profile.objects.filter(id__in=followers_ids)
+            followers = get_cleared(self.request,followers)
+            return followers
+        following_ids = Follower.objects.filter(user=user).values_list('followed_user', flat=True)
+        following = Profile.objects.filter(id__in=following_ids)
+        following = get_cleared(self.request,following)
+        return following
+
+
+    def get_serializer_class(self):
+        if self.request.user.is_staff:
+            self.serializer_class = AdminProfileSerializer
+        else:
+            self.serializer_class = ProfileSerializer
+        return super(FollowersListView, self).get_serializer_class()
+
+class FriendsListView(generics.ListAPIView):
+    serializer_class = ProfileSerializer
+    search_fields = ('id', 'username',)
+    lookup_field = 'id'
+    permissions_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        query_params = self.request.query_params.get('query_params')
+        query_params_id = self.request.query_params.get('query_params_id')
+        if query_params_id:
+            user = get_object_or_404(Profile, id=query_params_id)
+        else:
+            user = self.request.user
+        if query_params == "pending" and user == self.request.user:
+            friend_requests_ids = Friendship.objects.filter(sender=user, is_active=False).values_list("receiver_id", flat=True)
+            friend_requests = Profile.objects.filter(id__in=friend_requests_ids)
+            friend_requests = get_cleared(self.request,friend_requests)
+            return friend_requests
+        elif query_params == "requests" and user == self.request.user:
+            friend_requests_ids = Friendship.objects.filter(receiver=user, is_active=False).values_list("sender_id", flat=True)
+            friend_requests = Profile.objects.filter(id__in=friend_requests_ids)
+            friend_requests = get_cleared(self.request,friend_requests)
+            return friend_requests
+        friends_ids = Friendship.objects.filter(
+            Q(sender=user, is_active=True) | Q(receiver=user, is_active=True)
+        ).select_related("sender", "receiver").values("sender_id", "receiver_id").values_list(flat=True)
+        friends = Profile.objects.filter(id__in=set(friends_ids))
+        friends = get_cleared(self.request,friends)
+        return friends
+        
+
+
+    def get_serializer_class(self):
+        if self.request.user.is_staff:
+            self.serializer_class = AdminProfileSerializer
+        else:
+            self.serializer_class = ProfileSerializer
+        return super(FriendsListView, self).get_serializer_class()
 
 class MessagePagination(pagination.PageNumberPagination):
     page_size = 50  # Default page size

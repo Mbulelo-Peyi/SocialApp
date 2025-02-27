@@ -1,7 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, AbstractUser, PermissionsMixin
 import datetime
-from django.utils.timezone import localdate
+from django.utils import timezone 
+from django.utils.timesince import timesince as timesince_ , timeuntil
 from django.contrib import auth
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -268,7 +269,30 @@ class Event(models.Model):
     title = models.CharField(max_length=100)
     description = models.TextField()
     date = models.DateTimeField()
+    venue = models.CharField(max_length=100)
+    attendees = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="attendees", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        ctx = {
+            'community': self.community,
+            'title': self.title, 
+            'date_time': self.timesince,
+        }
+        if self.date > timezone.now():
+            return u'%(community)s has %(title)s event in %(date_time)s' % ctx
+        return u'%(community)s has %(title)s event %(date_time)s ago' % ctx
+    
+    @property
+    def timesince(self, now=None):
+        """
+        Shortcut for the ``django.utils.timesince.timesince`` function of the
+        current timestamp.timeuntil
+        """
+        if self.date > timezone.now():
+            return timeuntil(self.date, now)
+        return timesince_(self.date, now)
+    
 
 class BannedUser(models.Model):
     slug = models.SlugField(unique=True, max_length=255, blank=True, editable=False)

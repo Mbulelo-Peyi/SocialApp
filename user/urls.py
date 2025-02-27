@@ -12,4 +12,6 @@ urlpatterns = [
     path('api/common-password/', views.CommonPasswordsView.as_view(), name='common-password'),
     path('api/numeric-password/', views.NumericPasswordValidator.as_view(), name='numeric-password'),
     path('api/secure-password/', views.UserAttributeSimilarityValidator.as_view(), name='secure-password'),
+    path('api/followers/', views.FollowersListView.as_view(), name='followers'),
+    path('api/friends/', views.FriendsListView.as_view(), name='friends'),
 ]

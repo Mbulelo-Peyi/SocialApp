@@ -2,7 +2,7 @@ import React from 'react';
 import { FollowButton, FriendShipButton } from '../features/index';
 
 
-const FollowersCard = ({ relation, follow, type}) => {
+const FollowersCard = ({ relation, follow, type, community }) => {
     return (
         <li className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -20,11 +20,19 @@ const FollowersCard = ({ relation, follow, type}) => {
                     <p className="text-sm text-gray-600">@{relation?.username}</p>
                 </div>
             </div>
-            {follow ?(
-                <FollowButton id={relation?.id} type={type} />
-            ):(
-                <FriendShipButton id={relation?.id} type={type} />
-            )}
+            <React.Fragment>
+                {community ? (
+                    <></>
+                ):(
+                    <React.Fragment>
+                        {follow ?(
+                            <FollowButton id={relation?.id} type={type} />
+                        ):(
+                            <FriendShipButton id={relation?.id} type={type} />
+                        )}
+                    </React.Fragment>
+                )}
+            </React.Fragment>
         </li>
     )
 }

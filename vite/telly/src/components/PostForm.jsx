@@ -1,10 +1,9 @@
 import { CircleOff } from 'lucide-react';
-import React, { useState, useContext } from 'react';
-import { useAxios, AuthContext } from './index';
+import React, { useState } from 'react';
+import { useAxios } from './index';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-const PostForm = () => {
-    const { user } = useContext(AuthContext);
+const PostForm = ({ author_content_type, author_object_id }) => {
     const [postText, setPostText] = useState("");
     const [postFiles, setPostFiles] = useState([]);
     const [scheduled, setScheduled] = useState("");
@@ -45,8 +44,8 @@ const PostForm = () => {
     const postData = async () =>{
         const formData = new FormData()
         formData.append("content",postText);
-        formData.append("author_content_type","profile");
-        formData.append("author_object_id",user.id);
+        formData.append("author_content_type",author_content_type);
+        formData.append("author_object_id",author_object_id);
         formData.append("scheduled_time",scheduled)
         postFiles?.forEach((file)=>{
             formData.append("media",file)

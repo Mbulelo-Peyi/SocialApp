@@ -1,12 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { PostCard, useAxios } from './index';
+import { PostCard } from './index';
 import { useIntersection } from '@mantine/hooks';
-import { useInfiniteQuery, useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 
-const PostList = () => {
-    const fetchInterval = 1000*60*10;
-    const queryClient = useQueryClient();
-    const api = useAxios();
+const PostList = ({ posts, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading }) => {
     const targetRef = useRef();
     const { ref, entry } = useIntersection({
         root: targetRef.current,
@@ -15,50 +11,12 @@ const PostList = () => {
     const isInViewport = entry?.isIntersecting;
 
 
-    const {
-        data,
-        fetchNextPage,
-        hasNextPage,
-        isFetchingNextPage,
-        isLoading,
-    } = useInfiniteQuery({
-        queryKey:['feed', 'infinite'],
-        getNextPageParam: (lastPage) => {
-            try {
-                const nextPage = lastPage?.next ? lastPage?.next.split('page=')[1] : null;
-                return nextPage;
-            } catch (error) {
-                return null;
-            };
-        },
-        queryFn: (pageParam)=> getData(pageParam),
-
-    });
-
     useEffect(()=>{
         if (isInViewport) {
             fetchNextPage();
         }
     },[isInViewport, entry])
 
-    const getData = async ({ pageParam = 1 }) => {
-        const config = {
-            headers: {
-                "Content-Type":"application/json",
-            }
-        };
-        try {
-            const response = await api.get(
-                `/content/api/feed/?page=${pageParam}`,
-                config
-            );
-            return response.data;
-        } catch (error) {
-            return error;
-        }
-    };
-
-    const posts = data?.pages.flatMap(page => page?.results);
 
     return (
         <div>

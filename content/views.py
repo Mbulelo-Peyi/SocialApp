@@ -76,7 +76,6 @@ class PostViewSet(viewsets.ModelViewSet):
                 if request.user != author:
                     raise ValidationError({"error": "You are not authorized to create posts for this user."})
                 post = Post.posts.create_post(request._request, author,data['content'],data['scheduled_time'])
-                print(files)
                 post.media.add(*files)
                 post.tags.add(*tags)
                 post.hashtags.add(*hashtags)
@@ -145,8 +144,7 @@ class PostViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         queryset = Post.objects.all()
-
-        author_content_type = ContentType.objects.get_for_model(Community)
+        author_content_type = ContentType.objects.get(model=self.request.query_params.get('author_content_type'))
         author_object_id = self.request.query_params.get('author_object_id')
         if author_content_type and author_object_id:
             queryset = queryset.filter(

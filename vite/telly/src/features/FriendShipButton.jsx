@@ -76,7 +76,7 @@ const FriendShipButton = ({ type, id }) => {
 
     return (
         <React.Fragment>
-            {type==="sent_friend_requests" ? (
+            {type==="pending" ? (
                 <button
                 value={id}
                 aria-label='cancel'
@@ -86,7 +86,7 @@ const FriendShipButton = ({ type, id }) => {
                 >
                     Pending
                 </button>
-            ):type==="friend_requests" ?(
+            ):type==="requests" ?(
                 <div className="flex justify-center items-center space-x-1">
                     <button
                     value={id}

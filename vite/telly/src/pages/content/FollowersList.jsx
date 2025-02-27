@@ -1,12 +1,15 @@
-import React, { useRef, useState, useEffect, useContext } from 'react';
-import { useAxios, AuthContext, FollowersCard } from '../../components/index';
+import React, { useRef, useState, useEffect } from 'react';
+import { useAxios, FollowersCard } from '../../components/index';
 import { useIntersection } from '@mantine/hooks';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { LucideBadgeX, Search } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 
 const FollowersList = () => {
-    const { user } = useContext(AuthContext);
     const [type, setType] = useState("followers");
     const [search, setSearch] = useState('');
+    const [lookup, setLookup] = useState(false);
+    const { user_id } = useParams();
     const queryClient = useQueryClient();
     const api = useAxios();
     const targetRef = useRef();
@@ -59,7 +62,8 @@ const FollowersList = () => {
         };
         try {
             const response = await api.get(
-                `/user/api/profile/${user?.id}/${type}/?page=${pageParam}`,
+                lookup?`/user/api/followers/?query_params_id=${user_id}&query_params=${type}&search_query=${search}&page=${pageParam}`:
+                `/user/api/followers/?query_params_id=${user_id}&query_params=${type}&page=${pageParam}`,
                 config
             );
             return response.data;
@@ -75,34 +79,54 @@ const FollowersList = () => {
         return followers
     };
 
+    const handleSearch = (e) =>{
+        e.preventDefault();
+        if (search.trim() === "") return;
+        setLookup(true);
+        console.log(lookup,search.trim())
+        followersMutation.mutate(type);
+    };
+    const clearSearch = () =>{
+        setLookup(false);
+        setSearch("");
+        followersMutation.mutate("followers");
+    };
+
     return (
         <div className="bg-white p-4 rounded-lg shadow-md">
             <h3 className="text-xl font-semibold mb-4">Followers</h3>
 
             {/* Search Bar */}
-            <input
-                type="text"
-                placeholder="Search followers..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="mb-4 p-2 border rounded w-full"
-            />
-            <div className="flex justify-center items-center py-4 w-full space-x-0">
-                <button
-                onClick={()=>followersMutation.mutate("followers")} 
-                className={`w-1/2 text-center ${type==="followers"?"bg-blue-200":"bg-gray-300 text-gray-700"}`} 
-                disabled={followersMutation.isPending}>
-                    <span className={`text-lg font-semibold leading-none ${type==="followers"?"text-blue-700":"text-gray-700"} `}>followers</span>
-                    <hr className={`w-full h-1 py-1 ${type==="followers"?"bg-blue-700":"bg-gray-700 "}`}/>
-                </button>
-                <button 
-                onClick={()=>followersMutation.mutate("following")} 
-                className={`w-1/2 text-center ${type==="following"?"bg-blue-200":"bg-gray-300 text-gray-700 "}`} 
-                disabled={followersMutation.isPending}>
-                    <span className={`text-lg font-semibold leading-none ${type==="following"?"text-blue-700":"text-gray-700"} `}>following</span>
-                    <hr className={`w-full h-1 py-1 ${type==="following"?"bg-blue-700":"bg-gray-700 "}`}/>
-                </button>
-            </div>
+            <form className="flex justify-center items-baseline" onSubmit={handleSearch}>
+                <input
+                    type="search"
+                    placeholder="Search followers..."
+                    value={search}
+                    onChange={(e)=>setSearch(e.target.value)}
+                    className="mb-4 p-2 border rounded w-10/12 flex-1"
+                />
+                <button className="bg-blue-200 text-center" type="submit"><Search className="text-blue-600" /></button>
+            </form>
+            {lookup ?(
+                <LucideBadgeX onClick={clearSearch} />
+            ):(
+                <div className="flex justify-center items-center py-4 w-full space-x-0">
+                    <button
+                    onClick={()=>followersMutation.mutate("followers")} 
+                    className={`w-1/2 text-center ${type==="followers"?"bg-blue-200":"bg-gray-300 text-gray-700"}`} 
+                    disabled={followersMutation.isPending}>
+                        <span className={`text-lg font-semibold leading-none ${type==="followers"?"text-blue-700":"text-gray-700"} `}>followers</span>
+                        <hr className={`w-full h-1 py-1 ${type==="followers"?"bg-blue-700":"bg-gray-700 "}`}/>
+                    </button>
+                    <button 
+                    onClick={()=>followersMutation.mutate("following")} 
+                    className={`w-1/2 text-center ${type==="following"?"bg-blue-200":"bg-gray-300 text-gray-700 "}`} 
+                    disabled={followersMutation.isPending}>
+                        <span className={`text-lg font-semibold leading-none ${type==="following"?"text-blue-700":"text-gray-700"} `}>following</span>
+                        <hr className={`w-full h-1 py-1 ${type==="following"?"bg-blue-700":"bg-gray-700 "}`}/>
+                    </button>
+                </div>
+            )}
             {/* Followers List */}
             {!isLoading && (
                 <React.Fragment>
