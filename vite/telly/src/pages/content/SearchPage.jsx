@@ -67,15 +67,6 @@ const SearchPage = () =>{
     },[isInViewport, entry])
 
     const getSearchResults = ({ pageParam = 1 }) =>{
-        // if (filter===""){
-        //     return getQuery(
-        //         filter === "friends" ? `/api/${}/?page=${pageParam}&search_query=${query}`:
-        //         filter === "events" ? `/api/${}/?page=${pageParam}&search_query=${query}`:
-        //         `/api/${}/?page=${pageParam}&search_query=${query}`
-        //     );
-        // }else {
-        //     return getQuery(`/api/${}/?page=${pageParam}&search_query=${query}`);
-        // };
         return getQuery(
             filter === "friends" ? `/user/api/profile/?search_query=${query}&page=${pageParam}`:
             filter === "events" ? `/user/api/events/?search_query=${query}&page=${pageParam}`:
