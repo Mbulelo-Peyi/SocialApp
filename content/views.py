@@ -582,27 +582,10 @@ class NotificationsViewSet(NotificationsBaseViewSet):
 
 
     def get_queryset(self):
-        notifications = self.request.user.notifications.active().exclude(category="oi")
-        notifications = notifications.exclude(category="p")
+        notifications = self.request.user.notifications.active()
         return notifications.order_by("-timestamp")
     
 
 
-class TestAPIView(views.APIView):
 
-    def get(self, request, *args, **kwargs):
-        from user.serializers import ProfileSerializer, CommunitySerializer
-        comments = Comment.objects.all()
-        print(comments.values_list("user__id",flat=True))
-        cl = []
-        for comment in comments:
-            if isinstance(comment.post.author, Profile):
-                serializer = ProfileSerializer(comment.post.author)
-                print(comment.post.author)
-                cl.append(serializer.data)
-            elif isinstance(comment.post.author, Community):
-                serializer = CommunitySerializer(comment.post.author)
-                cl.append(serializer.data)
-        print(cl)
-        return Response(cl, status=status.HTTP_200_OK)
 # Create your views here.
