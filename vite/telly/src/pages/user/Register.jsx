@@ -102,7 +102,7 @@ const Register = () => {
     };
     try {
       const response = await axios.post(
-        `http://127.0.0.1:8000/api/profile/`,
+        `http://127.0.0.1:8000/user/api/profile/`,
         data,
         config
       )
@@ -128,7 +128,7 @@ const Register = () => {
   }
   return (
     <Fragment>
-      <main className="relative top-[105px]">
+      <main className="relative">
         <div className="mt-7 bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-neutral-900 dark:border-neutral-700">
           <div className="p-4 sm:p-7">
             <div className="text-center">
@@ -239,13 +239,13 @@ const Register = () => {
                               </div>
                             )}
                             {!errors.password1 && !showPassword &&(
-                              <button className="absolute inset-y-0 border-none end-0 cursor-pointer pe-3" onClick={togglePassword}>
-                                <LucideEye size={20} color={'#1e293b'} />
+                              <button className="absolute inset-y-0  border-none end-0 cursor-pointer pe-3" onClick={togglePassword}>
+                                <LucideEye className="text-[#1e293b] dark:text-white" size={20} />
                               </button>
                             )}
                             {!errors.password1 && showPassword &&(
                               <button className="absolute inset-y-0 end-0 border-none cursor-pointer pe-3" onClick={togglePassword}>
-                                <LucideEyeOff size={20} color={'#1e293b'} />
+                                <LucideEyeOff className="text-[#1e293b] dark:text-white" size={20} />
                               </button>
                             )}
                         </div>
@@ -279,12 +279,12 @@ const Register = () => {
                           )}
                           {!errors.password2 && !showConfirmPassword &&(
                             <button className="absolute inset-y-0 border-none end-0 cursor-pointer pe-3" onClick={toggleConfirmPassword}>
-                              <LucideEye size={20} color={'#1e293b'} />
+                              <LucideEye className="text-[#1e293b] dark:text-white" size={20} />
                             </button>
                           )}
                           {!errors.password2 && showConfirmPassword &&(
                             <button className="absolute inset-y-0 end-0 border-none cursor-pointer pe-3" onClick={toggleConfirmPassword}>
-                              <LucideEyeOff size={20} color={'#1e293b'} />
+                              <LucideEyeOff className="text-[#1e293b] dark:text-white" size={20} />
                             </button>
                           )}
                         </div>

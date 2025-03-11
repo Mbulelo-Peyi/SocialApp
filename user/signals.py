@@ -2,7 +2,6 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from user.models import Community, CommunityRole, MembershipRequest, Friendship,ChatRoom
 
-
 @receiver(post_save, sender=Community)
 def create_community(sender, instance, created, **kwargs):
     if created:
@@ -29,6 +28,10 @@ def membership_request(sender, instance, **kwargs):
 def friendship_status(sender, instance, **kwargs):
     if instance.is_active:
         name = f"{instance.sender.username} chat with {instance.receiver.username}"
+        room = ChatRoom.objects.filter(members=instance.sender)
+        room = room.filter(members=instance.receiver)
+        if room.exists():
+            return
         chat = ChatRoom.objects.create(name=name, is_group=False)
         chat.members.add(instance.sender)
         chat.members.add(instance.receiver)

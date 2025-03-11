@@ -19,3 +19,6 @@ moviepy.txt
 sentiment_train.csv
 sentiment_test.csv
 sentiment_validation.csv
+consumers.txt
+common-passwords.txt.gz
+experiments

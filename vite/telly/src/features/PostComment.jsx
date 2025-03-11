@@ -75,7 +75,7 @@ const PostComment = ({ post }) => {
     };
 
     return (
-        <div className="flex">
+        <div className="flex space-x-2">
             <button className="text-gray-600 hover:text-gray-800">
                 <Link to={`/post/${post?.id}/`}><span>💬 {commentCountQuery.data?.comment_count}</span></Link>
             </button>

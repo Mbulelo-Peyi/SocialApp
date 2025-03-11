@@ -135,7 +135,7 @@ const FollowersList = () => {
                     ) : (
                         <ul className="space-y-4">
                             {followers?.map((relation) => (
-                                <FollowersCard key={relation?.id} relation={relation} follow={follow} type={type} />
+                                <FollowersCard key={relation?.id} relation={relation} follow={follow} type={type} user_id={user_id} />
                             ))}
                             {(hasNextPage || isFetchingNextPage) && (
                                 <div className="flex flex-col items-center justify-center">

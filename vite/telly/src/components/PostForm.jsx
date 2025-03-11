@@ -2,6 +2,7 @@ import { CircleOff } from 'lucide-react';
 import React, { useState } from 'react';
 import { useAxios } from './index';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { PostFiles } from '../features';
 
 const PostForm = ({ author_content_type, author_object_id }) => {
     const [postText, setPostText] = useState("");
@@ -103,14 +104,34 @@ const PostForm = ({ author_content_type, author_object_id }) => {
                 {postFiles?.length > 0 && (
                     <div className="flex overflow-x-auto py-3">
                         {postFiles?.map((file,index)=>(
-                            <React.Fragment key={index}>
-                                <button type="button" onClick={()=>handlePopFile(index)} className="relative -top-2 h-fit w-auto left-8 rounded-full bg-teal-100"><CircleOff /></button>
-                                <img
-                                    src={URL.createObjectURL(file)}
-                                    alt={`Attachment ${index + 1}`}
-                                    className="w-20 h-20 object-cover rounded-md mx-4"
-                                /> 
-                            </React.Fragment>
+                            // <React.Fragment key={index}>
+                            //     <button type="button" onClick={()=>handlePopFile(index)} className="relative -top-2 h-fit w-auto left-8 rounded-full bg-teal-100"><CircleOff /></button>
+                            //     <img
+                            //         src={URL.createObjectURL(file)}
+                            //         alt={`Attachment ${index + 1}`}
+                            //         className="w-20 h-20 object-cover rounded-md mx-4"
+                            //     />
+                            //     {file.type.startsWith("image/") ? (
+                            //         <img
+                            //             src={URL.createObjectURL(file)}
+                            //             alt={`Attachment ${index + 1}`}
+                            //             className="w-20 h-20 object-cover rounded-md mx-4"
+                            //         />
+                            //     ) : file.type.startsWith("video/") ? (
+                            //         <video
+                            //             src={URL.createObjectURL(file)}
+                            //             alt={`Attachment ${index + 1}`}
+                            //             className="w-20 h-20 object-cover rounded-md mx-4"
+                            //             controls
+                            //             controlsList='nodownload'
+                            //         ></video>
+                            //     ) : (
+                            //         <div className="text-gray-700 text-sm truncate">
+                            //             {file.name}
+                            //         </div>
+                            //     )} 
+                            // </React.Fragment>
+                            <PostFiles key={index} file={file} index={index} handlePopFile={handlePopFile} />
                         ))}
                     </div>
                 )}

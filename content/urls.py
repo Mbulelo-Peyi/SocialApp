@@ -12,5 +12,6 @@ router.register(r'comment-replys', views.CommentReplyListDetailViewSet, basename
 urlpatterns = [
     path('api/', include(router.urls), name='api'),
     path('api/feed/', views.UserPostFeedView.as_view(), name='feed'),
+    path('api/post-author/<int:post_id>/', views.PostAuthorView.as_view(), name='post-author'),
 
 ]

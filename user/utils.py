@@ -66,3 +66,14 @@ def create_media_files(request,files:list)->list:
         )
         media_files.append(media)
     return media_files
+
+def geo_tag(request, user):
+    ip_address,country,city,system,device,browser,browser_version = get_info(request)
+    user.ip_address = ip_address
+    user.country = country
+    user.city = city
+    user.system = system
+    user.device = device
+    user.browser = browser
+    user.browser_version = browser_version
+    user.save()

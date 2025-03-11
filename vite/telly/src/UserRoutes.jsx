@@ -40,7 +40,7 @@ const UserRoutes = () => {
               <Route path='/settings' element={<Settings/>}></Route>
               <Route path='/delete-account' element={<DeleteAccount/>}></Route>
               <Route path='/password-change' element={<PasswordChange />}></Route>
-              <Route path='/profile' element={<Profile />}></Route>
+              <Route path='/profile/:user_id' element={<Profile />}></Route>
               <Route path='/notifications' element={<Notifications />}></Route>
               {/*  */}
             </Route>

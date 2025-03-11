@@ -36,7 +36,7 @@ const Complaint = () => {
                 "Content-Type": "application/json",
             },
         };
-        await api.post(`/api/complaint-create/`,data,config)
+        await api.post(`/user/api/complaint-create/`,data,config)
         .then(res=>{return res.data}).catch(err=>console.log(err))
     };
   

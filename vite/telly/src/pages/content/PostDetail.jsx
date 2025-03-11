@@ -1,8 +1,9 @@
-import React from "react";
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from "react";
 import { useParams } from "react-router-dom";
-import { CommentSection, useAxios, Reactions, ShareButton } from "../../components";
-import { ImageTag, VideoTag } from "../../features";
+import { CommentSection, useAxios, Reactions, ShareButton, Slide, PostEdit } from "../../components";
+import { useQuery } from '@tanstack/react-query';
+import { LucidePen } from 'lucide-react';
+import { Modal } from "../../features";
 
 
 
@@ -11,6 +12,7 @@ const PostDetail = () => {
     const { post_id } = useParams();
     const api = useAxios();
     const fetchInterval = 1000*60*10;
+    const [editing, setEditing] = useState(false);
 
     const postQuery = useQuery({
         queryKey: ['post', post_id],
@@ -18,7 +20,29 @@ const PostDetail = () => {
         refetchInterval: fetchInterval,
     });
 
-    
+    const postPermsQuery = useQuery({
+        queryKey: ['post-permissions', postQuery.data?.id],
+        queryFn: ()=> getPostPerms(),
+        refetchInterval: fetchInterval,
+    });
+
+
+    const getPostPerms = async () =>{
+        const config = {
+            headers: {
+                "Content-Type": "application/json",
+            }
+        }
+        try {
+            const response = await api.get(
+                `/content/api/post/${post_id}/get_post_author/`,
+                config
+            )
+            return response.data;
+        } catch (error) {
+            return error;
+        }
+    };
 
 
     const getPost = async () =>{
@@ -38,7 +62,7 @@ const PostDetail = () => {
         }
     };
 
-    
+    const onClose = ()=>{setEditing(prev=>!prev)};
 
     return (
         <div className="bg-gray-100 min-h-screen p-6">
@@ -51,25 +75,19 @@ const PostDetail = () => {
 
                 {/* Post Content */}
                 <div className="mb-6">
-                    {postQuery.data?.content && <p className="text-gray-700 text-lg mb-4">{postQuery.data?.content}</p>}
+                {!postPermsQuery.isLoading && postPermsQuery.data?.status ? (
+                    <div className="flex">
+                        {postQuery.data?.content && <p className="text-gray-700 mb-4 flex-1">{postQuery.data?.content}</p>}
+                        <button onClick={onClose}><LucidePen /> edit</button>
+                    </div>
+                ):(
+                    <React.Fragment>{postQuery.data?.content && <p className="text-gray-700 mb-4">{postQuery.data?.content}</p>}</React.Fragment>
+                )}
 
                     {/* Post Files */}
                     {postQuery.data?.media && postQuery.data?.media.length > 0 && (
-                        <div className="grid grid-cols-2 gap-2">
-                            {Array.from(postQuery.data?.media).map((file, index) => (
-                                <div
-                                    key={file?.id}
-                                    className="border border-gray-300 rounded-lg p-2"
-                                >
-                                    {file?.mime_type?.startsWith("image") ? (
-                                        <ImageTag src={file?.media_file} last={true} blurred={file?.blur} alt={`Attachment ${index + 1}`} className="w-full h-32 object-cover rounded-md" />
-                                    ) : file?.mime_type?.startsWith("video") ? (
-                                        <VideoTag src={file?.media_file} last={true} blurred={file?.blur}/>
-                                    ):(
-                                        <div className="text-gray-700 text-sm truncate">{file?.name}</div>
-                                    )}
-                                </div>
-                            ))}
+                        <div className="flex justify-center items-center">
+                            <Slide slides={postQuery.data?.media} />
                         </div>
                     )}
                 </div>
@@ -91,6 +109,11 @@ const PostDetail = () => {
                 
 
             </div>
+            <Modal open={editing} onClose={onClose}>
+                {!postQuery.isLoading &&(
+                    <PostEdit post={postQuery.data} onClose={onClose}/>
+                )}
+            </Modal>
         </div>
     );
 };

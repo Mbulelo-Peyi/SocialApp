@@ -15,6 +15,9 @@ class PostFile(models.Model):
     mime_type = models.CharField(max_length=20,blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"{self.user.username} file {self.mime_type}"
+
 class Tag(models.Model):
     name = models.CharField(max_length=100, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -66,15 +69,6 @@ class Post(models.Model):
     posts = PostManager()
 
 
-    '''
-    {
-        "author_object_id": "1",
-        "author_content_type":"profile",
-        "content": "This is a test",
-        "adult_rated": false
-    }
-    '''
-
     @property
     def share_count(self):
         return self.share.count()
@@ -89,6 +83,10 @@ class Post(models.Model):
     @property
     def author_model(self):
         return ContentType.objects.get_for_model(self.author_content_type)
+    
+    @property
+    def post_author(self):
+        return self.author_model.objects.get(id=self.author_object_id)
 
 
 class Reaction(models.Model):
@@ -184,5 +182,8 @@ class ViewedPost(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     viewed_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} viewed post {self.post.id}"
 
 # Create your models here.

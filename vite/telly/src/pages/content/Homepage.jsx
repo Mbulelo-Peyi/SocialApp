@@ -1,5 +1,5 @@
 import React, { useContext } from "react";
-import { PostList, PostForm, AuthContext } from "../../components/index";
+import { PostList, PostForm, AuthContext, useAxios } from "../../components/index";
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 const Home = () => {
@@ -44,8 +44,7 @@ const Home = () => {
     };
 
     const posts = data?.pages.flatMap(page => page?.results);
-
-
+ 
     return (
         <div className="bg-gray-100 min-h-screen">
             <div className="max-w-4xl mx-auto px-4">

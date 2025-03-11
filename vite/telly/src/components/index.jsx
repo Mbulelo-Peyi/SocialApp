@@ -21,6 +21,13 @@ import ShareButton from './ShareButton';
 import FollowersCard from './FollowersCard';
 import CommunityCard from './CommunityCard';
 import CommunityHeader from './CommunityHeader';
+import EventAdd from './EventAdd';
+import Rule from './Rule';
+import ProfileEdit from './ProfileEdit';
+import Slide from './Slide';
+import ChatCard from './ChatCard';
+import PostEdit from './PostEdit';
+import EventCard from './EventCard';
 
 
 export{
@@ -45,6 +52,13 @@ export{
     FollowersCard,
     CommunityCard,
     CommunityHeader,
+    EventAdd,
+    Rule,
+    ProfileEdit,
+    ChatCard,
+    PostEdit,
+    EventCard,
+    Slide,
     useAxios,
     AuthContext,
 }

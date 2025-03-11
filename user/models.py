@@ -221,13 +221,21 @@ class Message(models.Model):
     room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name="messages")
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='message_sender')
     content = models.TextField()
-    media = models.ForeignKey(MediaMessage, on_delete=models.CASCADE, related_name="message_media")
+    media = models.ManyToManyField(MediaMessage, related_name="message_media", blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_read_by = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="read_messages", blank=True)
     delivered = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Message from {self.sender} to {self.receiver}"
+        return f"Message from {self.sender} to {self.room}"
+    
+    @property
+    def timesince(self, now=None):
+        """
+        Shortcut for the ``django.utils.timesince.timesince`` function of the
+        current timestamp.timeuntil
+        """
+        return timesince_(self.timestamp, now)
   
 class MembershipRequest(models.Model):
     STATUS_CHOICES = [
@@ -250,6 +258,9 @@ class MembershipRequest(models.Model):
     objects = models.Manager()
     requests = MembershipRequestManager()
 
+    def __str__(self):
+        return f"{self.sender} has requested {self.user.username if isinstance(self.sender, Profile) else self.community.name } to join {self.community.name}"
+
 class CommunityRole(models.Model):
     ROLE_CHOICES = [
         ('Member', 'Member'),
@@ -260,9 +271,15 @@ class CommunityRole(models.Model):
     community = models.ForeignKey(Community, on_delete=models.CASCADE)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Member')
 
+    def __str__(self):
+        return f"{self.user.username} is {self.role} to {self.community.name}"
+
 class CommunityRule(models.Model):
     community = models.ForeignKey(Community, on_delete=models.CASCADE, related_name="rules")
     text = models.TextField()
+
+    def __str__(self):
+        return f"{self.community.name} has {self.text[:30]} rule"
 
 class Event(models.Model):
     community = models.ForeignKey(Community, on_delete=models.CASCADE, related_name="events")
@@ -292,7 +309,21 @@ class Event(models.Model):
         if self.date > timezone.now():
             return timeuntil(self.date, now)
         return timesince_(self.date, now)
-    
+
+class FrequentlyAskedQuestion(models.Model):
+    question = models.CharField(max_length=255)
+    answer = models.CharField(max_length=255)
+
+    def __str__(self):
+        return f"{self.question} = {self.answer}"
+
+class Complaint(models.Model):
+    user = models.ForeignKey(Profile, on_delete=models.PROTECT)
+    issue = models.TextField()
+    time_stamp = models.DateTimeField(auto_now_add=True) 
+
+    def __str__(self):
+        return f"{self.user.username} has {self.issue[:30]} issue"   
 
 class BannedUser(models.Model):
     slug = models.SlugField(unique=True, max_length=255, blank=True, editable=False)

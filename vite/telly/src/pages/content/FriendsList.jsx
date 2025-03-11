@@ -140,7 +140,7 @@ const FriendsList = () => {
                     ) : (
                         <ul className="space-y-4">
                             {friends?.map((relation) => (
-                                <FollowersCard key={relation?.id} relation={relation}/>
+                                <FollowersCard key={relation?.id} relation={relation} user_id={user_id}/>
                             ))}
                             {(hasNextPage || isFetchingNextPage) && (
                                 <div className="flex flex-col items-center justify-center">

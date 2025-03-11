@@ -19,7 +19,8 @@ from user.utils import (
     get_community_requests, 
     get_user_community_requests,
     get_user_sent_community_requests,
-    create_media_files
+    create_media_files,
+    geo_tag
     )
 from user.banned_users import get_cleared
 
@@ -37,15 +38,6 @@ class ProfileViewSet(viewsets.ModelViewSet):
         to = [user.email]
         ActivationEmail(self.request, context).send(to)
 
-    def geo_tag(self, serializer):
-        ip_address,country,city,system,device,browser,browser_version = get_info(self.request)
-        serializer.validated_data['ip_address'] = ip_address
-        serializer.validated_data['country'] = country
-        serializer.validated_data['city'] = city
-        serializer.validated_data['system'] = system
-        serializer.validated_data['device'] = device
-        serializer.validated_data['browser'] = browser
-        serializer.validated_data['browser_version'] = browser_version
 
     @action(["post"], detail=True)
     def delete_account(self, request, *args, **kwargs):
@@ -71,7 +63,7 @@ class ProfileViewSet(viewsets.ModelViewSet):
         if not profile_picture:
             return Response(
                 {"error": "No active profile picture found."},
-                status=status.HTTP_404_NOT_FOUND,
+                status=status.HTTP_200_OK,
             )
         serializer = ProfilePictureSerializer(profile_picture, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -168,9 +160,10 @@ class ProfileViewSet(viewsets.ModelViewSet):
     def friendship_status(self, request, *args, **kwargs):
         me = request.user
         user = self.get_object()
-        friendship_status0 = Friendship.objects.filter(sender=user,receiver=me, is_active=True)
-        friendship_status1 = Friendship.objects.filter(sender=me,receiver=user, is_active=True)
-        if friendship_status0.exists() or friendship_status1.exists():
+        friends = Friendship.objects.filter(
+            Q(sender=user,receiver=me, is_active=True) | Q(sender=me,receiver=user, is_active=True)
+        ).select_related("sender", "receiver")
+        if friends.exists():
             return Response({"status":True}, status=status.HTTP_200_OK)
         return Response({"status":False}, status=status.HTTP_200_OK)
         
@@ -206,7 +199,17 @@ class ProfileViewSet(viewsets.ModelViewSet):
         self.perform_destroy(follow)
         return Response("No Content", status=status.HTTP_204_NO_CONTENT)
         
-
+    @action(["get"], detail=True)
+    def follow_status(self, request, *args, **kwargs):
+        me = request.user
+        user = self.get_object()
+        followers = Follower.objects.filter(
+            Q(followed_user=user,user=me) | Q(user=user,followed_user=me)
+        )
+        if followers.exists():
+            return Response({"status":True}, status=status.HTTP_200_OK)
+        return Response({"status":False}, status=status.HTTP_200_OK)
+        
     @action(["get"], detail=True)
     def followers(self, request, *args, **kwargs):
         user = self.get_object()
@@ -233,21 +236,36 @@ class ProfileViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(following, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(["get"], detail=True)
+    def chat_room(self, request, *args, **kwargs):
+        me = request.user
+        user = self.get_object()
+        room = ChatRoom.objects.filter(members=me)
+        room = room.filter(members=user)
+        if room.exists():
+            serializer = self.get_serializer(room, many=False, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response("No content", status=status.HTTP_200_OK)
+
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         if serializer.is_valid(raise_exception=True):
-            self.geo_tag(serializer)
             self.perform_create(serializer)
+        geo_tag(serializer.instance)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
     
     def update(self, request, *args, **kwargs):
-        serializer = ProfileProcessingSerializer(instance=request.user, data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:
-            return Response("BAD REQUEST", status=status.HTTP_400_BAD_REQUEST)
+        user = self.get_object()
+        if user == request.user:
+            serializer = ProfileProcessingSerializer(instance=user, data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            else:
+                return Response("BAD REQUEST", status=status.HTTP_400_BAD_REQUEST)
+        return Response("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
 
     def partial_update(self, request, *args, **kwargs):
         serializer = ProfileProcessingSerializer(instance=request.user, data=request.data)
@@ -270,7 +288,9 @@ class ProfileViewSet(viewsets.ModelViewSet):
         return get_cleared(self.request,Profile.objects.all())
 
     def get_serializer_class(self):
-        if self.request.user.is_staff:
+        if self.action == 'chat_room':
+            self.serializer_class = ChatRoomSerializer
+        elif self.request.user.is_staff:
             self.serializer_class = AdminProfileSerializer
         else:
             self.serializer_class = ProfileSerializer
@@ -472,23 +492,137 @@ class CommunityViewSet(viewsets.ModelViewSet):
         return Response(_("User not in group"), status=status.HTTP_400_BAD_REQUEST)
         
     @action(["get"], detail=True)
-    def community_events(self, request, *args, **kwargs):
-        community = self.get_object()
-        events = Event.objects.filter(community=community)
-        events = self.filter_queryset(events)
-        page = self.paginate_queryset(events)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True, context={'request': request})
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(events, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    @action(["get"], detail=True)
     def community_event(self, request, *args, **kwargs):
         community = self.get_object()
         event = get_object_or_404(Event,id=self.request.query_params.get('event_id'),community=community)
         serializer = self.get_serializer(event, many=False, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(["post"], detail=True)
+    def create_event(self, request, *args, **kwargs):
+        community = self.get_object()
+        community_role = CommunityRole.objects.filter(
+            community=community, 
+            user=request.user
+        ).first()
+
+        if not community_role or community_role.role not in ["Admin", "Moderator"]:
+            raise ValidationError({
+                "error": "You are not authorized to create posts in this community."
+            })
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.initial_data['community'] = community.id
+        if serializer.is_valid(raise_exception=True):
+            self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @action(["post"], detail=True)
+    def update_event(self, request, *args, **kwargs):
+        community = self.get_object()
+        event = Event.objects.filter(id=self.request.query_params.get('event_id')).first()
+        community_role = CommunityRole.objects.filter(
+            community=community, 
+            user=request.user
+        ).first()
+
+        if not community_role or community_role.role not in ["Admin", "Moderator"]:
+            raise ValidationError({
+                "error": "You are not authorized to create posts in this community."
+            })
+        serializer = self.get_serializer(instance=event, data=request.data, context={'request': request})
+        serializer.initial_data['community'] = community
+        if serializer.is_valid(raise_exception=True):
+            self.perform_update(serializer)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(["post"], detail=True)
+    def delete_event(self, request, *args, **kwargs):
+        community = self.get_object()
+        event = Event.objects.filter(id=self.request.query_params.get('event_id')).first()
+        community_role = CommunityRole.objects.filter(
+            community=community, 
+            user=request.user
+        ).first()
+
+        if not community_role or community_role.role not in ["Admin", "Moderator"]:
+            raise ValidationError({
+                "error": "You are not authorized to create posts in this community."
+            })
+        self.perform_destroy(event)
+        return Response("No Content", status=status.HTTP_204_NO_CONTENT)
+
+    @action(["get"], detail=True)
+    def community_rules(self, request, *args, **kwargs):
+        community = self.get_object()
+        rules = CommunityRule.objects.filter(community=community)
+        page = self.paginate_queryset(rules)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(rules, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(["post"], detail=True)
+    def add_community_rule(self, request, *args, **kwargs):
+        community = self.get_object()
+        community_role = CommunityRole.objects.filter(
+            community=community, 
+            user=request.user
+        ).first()
+
+        if not community_role or community_role.role not in ["Admin", "Moderator"]:
+            raise ValidationError({
+                "error": "You are not authorized to create posts in this community."
+            })
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.initial_data['community'] = community.id
+        if serializer.is_valid(raise_exception=True):
+            self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @action(["post"], detail=True)
+    def update_community_rule(self, request, *args, **kwargs):
+        community = self.get_object()
+        rule = CommunityRule.objects.filter(id=self.request.query_params.get('rule_id')).first()
+        community_role = CommunityRole.objects.filter(
+            community=community, 
+            user=request.user
+        ).first()
+
+        if not community_role or community_role.role not in ["Admin", "Moderator"]:
+            raise ValidationError({
+                "error": "You are not authorized to create posts in this community."
+            })
+        serializer = self.get_serializer(instance=rule, data=request.data, context={'request': request})
+        serializer.initial_data['community'] = community.id
+        if serializer.is_valid(raise_exception=True):
+            self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(["get"], detail=True)
+    def community_rule(self, request, *args, **kwargs):
+        community = self.get_object()
+        rule = get_object_or_404(CommunityRule,id=self.request.query_params.get('role_id'),community=community)
+        serializer = self.get_serializer(rule, many=False, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(["post"], detail=True)
+    def delete_community_rule(self, request, *args, **kwargs):
+        community = self.get_object()
+        rule = CommunityRule.objects.filter(id=self.request.query_params.get('rule_id')).first()
+        community_role = CommunityRole.objects.filter(
+            community=community, 
+            user=request.user
+        ).first()
+
+        if not community_role or community_role.role not in ["Admin", "Moderator"]:
+            raise ValidationError({
+                "error": "You are not authorized to create posts in this community."
+            })
+        self.perform_destroy(rule)
+        return Response("No Content", status=status.HTTP_204_NO_CONTENT)
 
 
     def create(self, request, *args, **kwargs):
@@ -530,12 +664,30 @@ class CommunityViewSet(viewsets.ModelViewSet):
                 self.serializer_class = AdminProfileSerializer
             else:
                 self.serializer_class = ProfileSerializer
-        elif self.action == "community_events" or self.action == "community_event":
+        elif self.action in ["community_event", "update_event"]:
             self.serializer_class = EventSerializer
+        elif self.action == "create_event":
+            self.serializer_class = EventProcessSerializer
+        elif self.action == ["community_rules", "update_community_rule", "community_rule"]:
+            self.serializer_class = CommunityRuleSerializer
+        elif self.action == "add_community_rule":
+            self.serializer_class = CommunityRuleProcessSerializer
         else:
             self.serializer_class = CommunitySerializer
         return super(CommunityViewSet, self).get_serializer_class()
 # Create your views here.
+class EventListView(generics.ListAPIView):
+    serializer_class = EventSerializer
+    search_fields = ('id', 'title', 'description', 'venue',)
+    permissions_classes = (permissions.IsAuthenticated,)
+
+    def get_queryset(self):
+        queryset = Event.objects.all()
+        community_id = self.request.query_params.get('community_id')
+        if community_id:
+            queryset = queryset.filter(community=community_id)
+            return queryset
+        return queryset
 
 class FollowersListView(generics.ListAPIView):
     serializer_class = ProfileSerializer
@@ -730,8 +882,61 @@ class MessageViewSet(viewsets.ModelViewSet):
                 return Message.objects.filter(room=room).order_by('-timestamp')
             return Message.objects.filter(sender=self.request.user).order_by('-timestamp')
 
+class ChatRoomListDetailViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = ChatRoomSerializer
+    permission_classes = [permissions.IsAuthenticated,]
+    lookup_field = 'id'
+
+    def get_queryset(self):
+        queryset = ChatRoom.objects.filter(members=self.request.user)
+        return queryset
 
 
+class ChatRoomView(generics.ListAPIView):
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAuthenticated,]
+
+    def get_queryset(self):
+        room_id = self.kwargs["room_id"]
+        room = ChatRoom.objects.filter(id=room_id,members=self.request.user)
+        queryset = Message.objects.filter(room=room.first()).order_by('timestamp')
+        return queryset
+
+class LastMessageAPIView(views.APIView):
+    serializer_class = MessageSerializer
+    lookup_field = 'id'
+    permission_classes = [permissions.IsAuthenticated,]
+
+    def get(self, request, *args, **kwargs):
+        room_id = self.kwargs["id"]
+        queryset = Message.objects.filter(room__id=room_id).order_by('timestamp').last()
+        serializer = self.serializer_class(queryset, many=False, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class FrequentlyAskedQuestionView(generics.ListAPIView):
+    serializer_class = FrequentlyAskedQuestionSerializer
+    filter_backends = (filters.OrderingFilter, filters.SearchFilter,)
+    queryset = FrequentlyAskedQuestion.objects.all()
+    search_fields = ('id', 'question', 'answer',)
+    permission_classes = (permissions.IsAuthenticatedOrReadOnly,)
+    lookup_field = 'id'
 
 
+class CreateComplaintView(generics.CreateAPIView):
+    serializer_class = ComplaintSerializer
+    permission_classes = (permissions.IsAuthenticated,)
 
+    def perform_create(self, serializer):
+        serializer.initial_data['user'] = self.request.user.id
+        return serializer
+    def get_success_headers(self, data):
+        return super().get_success_headers(data)
+
+    def create(self, request, *args, **kwargs):
+        serializer = ComplaintProccessingSerializer(data=request.data, context={'request': request})
+        serializer = self.perform_create(serializer)
+        if serializer.is_valid(raise_exception=True):
+            serializer.save()
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(status=status.HTTP_400_BAD_REQUEST)

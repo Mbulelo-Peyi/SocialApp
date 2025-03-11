@@ -17,6 +17,8 @@ from user.models import(
     CommunityRole,
     CommunityRule,
     Event,
+    Complaint,
+    FrequentlyAskedQuestion,
 )
 
 Profile = get_user_model()
@@ -71,7 +73,8 @@ class ProfileProcessingSerializer(serializers.ModelSerializer):
     sex = serializers.CharField(required=False)
     class Meta:
         model = Profile
-        fields = ['id','email', 'username', 'birthday', 'sex', 'address', 'postal_code', 'image', 'country']
+        fields = ['id','email', 'username', 'profile_pic', 'birthday', 'sex', 'image', 'country']
+        extra_kwargs = {'password': {'write_only': True}}
 
 
 class CustomPasswordChangeSerializer(serializers.Serializer):
@@ -198,6 +201,13 @@ class CommunityRuleSerializer(serializers.ModelSerializer):
         model = CommunityRule
         fields = "__all__"
 
+class CommunityRuleProcessSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = CommunityRule
+        fields = "__all__"
+
+
 class EventSerializer(serializers.ModelSerializer):
     community = CommunitySerializer(read_only=True)
     attendees = ProfileSerializer(required=False, many=True)
@@ -206,3 +216,25 @@ class EventSerializer(serializers.ModelSerializer):
         model = Event
         fields = ["id", "community", "attendees", "title", "description", "venue", "date", "created_at", "timesince"]
 
+class EventProcessSerializer(serializers.ModelSerializer):
+    attendees = ProfileSerializer(required=False, many=True)
+
+    class Meta:
+        model = Event
+        fields = ["id", "community", "attendees", "title", "description", "venue", "date", "created_at", "timesince"]
+
+class ComplaintSerializer(serializers.ModelSerializer):
+    user = ProfileSerializer(read_only=True)
+    class Meta:
+        model = Complaint
+        fields = "__all__"
+
+class ComplaintProccessingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Complaint
+        fields = "__all__"
+
+class FrequentlyAskedQuestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FrequentlyAskedQuestion
+        fields = "__all__"

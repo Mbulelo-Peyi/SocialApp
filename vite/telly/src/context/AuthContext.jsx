@@ -32,9 +32,7 @@ export const AuthProvider = ({children}) => {
             setAuthTokens(response.data);
             setUser(jwtDecode(response.data.access))
             localStorage.setItem('authTokens', JSON.stringify(response.data))
-            // console.log(JSON.stringify(response.data))
             console.log(response.data)
-            // navigate("/");
         } catch (error) {
             console.error("Error",error);
             alert("Something went wrong. Please try again");
@@ -79,7 +77,7 @@ export const AuthProvider = ({children}) => {
         };
         try {
             const response = await axios.post(
-                "http://127.0.0.1:8000/user-passwords/",
+                "http://127.0.0.1:8000/user/api/secure-password/",
                 {
                 email: email,
                 username: username,
@@ -103,7 +101,7 @@ export const AuthProvider = ({children}) => {
         };
         try {
             const response = await axios.post(
-                "http://127.0.0.1:8000/numeric-passwords/",
+                "http://127.0.0.1:8000/user/api/numeric-password/",
                 {
                 password: password,
                 },

@@ -48,7 +48,7 @@ const Faq = () => {
         };
         try {
             const response = await axios.get(
-                `${BASE_URL}/api/frequent-questions/?page=${pageParam}`,
+                `${BASE_URL}/user/api/frequent-questions/?page=${pageParam}`,
                 config
             );
             return response.data;

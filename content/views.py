@@ -7,7 +7,6 @@ from django.utils.timezone import now
 from django.db.models import Q
 from rest_framework.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
-
 #
 from content.pagination import CommentReplyPagination, CommentPagination
 from content.serializers import *
@@ -51,6 +50,7 @@ class PostViewSet(viewsets.ModelViewSet):
             self.perform_destroy(post)
             return Response(_("Post successfully deleted"), status=status.HTTP_204_NO_CONTENT)
         return Response(_("Unathorized action"), status=status.HTTP_401_UNAUTHORIZED)
+
 
 
     def create(self, request, *args, **kwargs):
@@ -144,6 +144,10 @@ class PostViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         queryset = Post.objects.all()
+        print(self.request.query_params.get('author_content_type'))
+        print(self.request.query_params.get('author_object_id'))
+        # print(ContentType.objects.get(model=self.request.query_params.get('author_content_type')))
+        print(ContentType.objects.get(model=self.request.query_params.get('author_content_type')))
         author_content_type = ContentType.objects.get(model=self.request.query_params.get('author_content_type'))
         author_object_id = self.request.query_params.get('author_object_id')
         if author_content_type and author_object_id:
@@ -151,16 +155,9 @@ class PostViewSet(viewsets.ModelViewSet):
                 author_content_type=author_content_type,
                 author_object_id=author_object_id
             )
+            print(queryset)
             queryset = queryset.order_by('-created_at')
             return queryset
-        author_content_type = ContentType.objects.get_for_model(user)
-        author_object_id = user.id
-        queryset = queryset.filter(
-            author_content_type=author_content_type,
-            author_object_id=author_object_id
-        )
-        queryset = queryset.order_by('-created_at')
-        return queryset
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -487,5 +484,22 @@ class CommentReplyListDetailViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(comment=comment)
             return queryset
         return queryset
+
+class PostAuthorView(views.APIView):
+    permission_classes = [permissions.IsAuthenticated,]
+
+    def get(self, request, *args, **kwargs):
+        post = get_object_or_404(Post, id=self.kwargs['post_id'])
+        if isinstance(post.author, Profile):
+            if self.request.user == post.author:
+                return Response({"status":True}, status=status.HTTP_200_OK)
+        elif isinstance(post.author, Community):
+            try:
+                user_role = CommunityRole.objects.get(community=post.author, user=self.request.user)
+                if user_role.role in ["Moderator", "Admin"]:
+                    return Response({"status":True}, status=status.HTTP_200_OK)
+            except CommunityRole.DoesNotExist:
+                return Response({"status":False}, status=status.HTTP_200_OK)
+        return Response({"status":False}, status=status.HTTP_200_OK)
 
 # Create your views here.

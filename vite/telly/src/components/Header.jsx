@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { SearchIcon } from 'lucide-react';
 import SearchBar from './SearchBar';
+import AuthContext from '../context/AuthContext';
 
 const Header = () => {
+    const { user } = useContext(AuthContext);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [search, setSearch] = useState(false);
 
@@ -18,22 +19,21 @@ const Header = () => {
                     SocialApp
                 </Link>
                 <nav className="hidden md:flex space-x-6">
-                    {/* <button onClick={() => setSearch((prev) => !prev)}><SearchIcon /></button> */}
                     <SearchBar />
                     <Link
-                        to="/profile"
+                        to={`/profile/${user?.id}`}
                         className="text-gray-600 hover:text-blue-600 font-semibold"
                     >
                         Profile
                     </Link>
                     <Link
-                        to="/community"
+                        to="/communities"
                         className="text-gray-600 hover:text-blue-600 font-semibold"
                     >
                         Communities
                     </Link>
                     <Link
-                        to="/chat"
+                        to="/chats"
                         className="text-gray-600 hover:text-blue-600 font-semibold"
                     >
                         Chat
@@ -69,14 +69,14 @@ const Header = () => {
                 <div className="md:hidden bg-white shadow-lg py-4 space-y-4 px-4">
                     <SearchBar />
                     <Link
-                        to="/profile"
+                        to={`/profile/${user?.id}`}
                         className="block text-gray-600 hover:text-blue-600 font-semibold"
                         onClick={toggleMenu}
                     >
                         Profile
                     </Link>
                     <Link
-                        to="/community"
+                        to="/communities"
                         className="block text-gray-600 hover:text-blue-600 font-semibold"
                         onClick={toggleMenu}
                     >

@@ -13,7 +13,7 @@ const CommunityMembers = () => {
         threshold: 0.1,
     });
     const isInViewport = entry?.isIntersecting;
-    const community = true
+    const community = true;
 
     const {
         data,
@@ -70,7 +70,7 @@ const CommunityMembers = () => {
                     ) : (
                         <ul className="space-y-4 py-5 px-3 bg-slate-200">
                             {members?.map((relation) => (
-                                <FollowersCard key={relation?.id} relation={relation} community={community} />
+                                <FollowersCard key={relation?.id} relation={relation} community={community} community_id={community_id} />
                             ))}
                             {(hasNextPage || isFetchingNextPage) && (
                                 <div className="flex flex-col items-center justify-center">
