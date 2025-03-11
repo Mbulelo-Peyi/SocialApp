@@ -3,6 +3,7 @@ __pycache__
 db.sqlite3
 .env
 media
+static
 stunnel
 user/tf_roberta_sentiment_model
 user/saved_bert_model
@@ -22,3 +23,4 @@ sentiment_validation.csv
 consumers.txt
 common-passwords.txt.gz
 experiments
+tests.py
