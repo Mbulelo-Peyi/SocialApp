@@ -8,10 +8,12 @@ router.register(r'comment', views.CommentViewSet, basename='comment')
 router.register(r'comments', views.CommentListDetailViewSet, basename='comments')
 router.register(r'comment-reply', views.CommentReplyViewSet, basename='comment-reply')
 router.register(r'comment-replys', views.CommentReplyListDetailViewSet, basename='comment-replys')
+router.register(r'notifications', views.NotificationsViewSet, basename='notifications')
 
 urlpatterns = [
     path('api/', include(router.urls), name='api'),
     path('api/feed/', views.UserPostFeedView.as_view(), name='feed'),
     path('api/post-author/<int:post_id>/', views.PostAuthorView.as_view(), name='post-author'),
+    path('api/test/', views.TestAPIView.as_view(), name='test'),
 
 ]

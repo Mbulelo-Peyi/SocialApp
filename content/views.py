@@ -14,6 +14,7 @@ from content.models import *
 from content.helpers import create_media,get_tags,get_hashtags,get_relations
 from content.utils import get_community_model, cleaned_posts,cleared_comments
 from user.models import CommunityRole, Follower, Friendship
+from user.utils import NotificationsBaseViewSet
 
 
 
@@ -502,4 +503,106 @@ class PostAuthorView(views.APIView):
                 return Response({"status":False}, status=status.HTTP_200_OK)
         return Response({"status":False}, status=status.HTTP_200_OK)
 
+
+class NotificationsViewSet(NotificationsBaseViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = (permissions.IsAuthenticated,)
+    lookup_field = 'id'
+
+    
+    def perform_destroy(self,instance):
+        if settings.get_config()['SOFT_DELETE']:
+            instance.deleted = True
+            instance.save()
+        else:
+            instance.delete()
+
+    @action(["get"], detail=False)
+    def unread_count(self, request, *args, **kwargs):
+        data = {
+            'unread_count': request.user.notifications.unread().count(),
+        }
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(["get"], detail=False)
+    def notifications_count(self, request, *args, **kwargs):
+        data = {
+            'count': request.user.notifications.active().count(),
+        }
+        return Response(data, status=status.HTTP_200_OK)
+    
+    @action(["get"], detail=False)
+    def unread_notification_list(self, request, *args, **kwargs):
+        queryset = request.user.notifications.unread().filter(deleted=False).order_by("-timestamp")
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+
+
+    @action(["post", "put", "delete"], detail=False)
+    def access_all(self, request, *args, **kwargs):
+        if request.method == "POST":
+            request.user.notifications.active().mark_all_as_read()
+            return Response(status=status.HTTP_200_OK)
+        elif request.method == "PUT":
+            request.user.notifications.active().mark_all_as_unread()
+            return Response(status=status.HTTP_200_OK)
+        elif request.method == "DELETE":
+            request.user.notifications.active().mark_all_as_deleted()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        
+    @action(["get", "put", "patch", "delete"], detail=False)
+    def me(self, request, *args, **kwargs):
+        request.user.notifications.mark_all_as_active()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+        
+    def retrieve(self, request, *args, **kwargs):
+        notification = self.get_object()
+        notification.mark_as_read()
+        serilaizer = self.serializer_class(notification)
+        return Response(serilaizer.data, status=status.HTTP_200_OK)
+
+    def update(self, request, *args, **kwargs):
+        notification = self.get_object()
+        notification.mark_as_unread()
+        serilaizer = self.serializer_class(notification)
+        return Response(serilaizer.data, status=status.HTTP_200_OK)
+    
+    def destroy(self, request, *args, **kwargs):
+        notification = self.get_object()
+        self.perform_destroy(notification)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+    def get_queryset(self):
+        notifications = self.request.user.notifications.active().exclude(category="oi")
+        notifications = notifications.exclude(category="p")
+        return notifications.order_by("-timestamp")
+    
+
+
+class TestAPIView(views.APIView):
+
+    def get(self, request, *args, **kwargs):
+        from user.serializers import ProfileSerializer, CommunitySerializer
+        comments = Comment.objects.all()
+        print(comments.values_list("user__id",flat=True))
+        cl = []
+        for comment in comments:
+            if isinstance(comment.post.author, Profile):
+                serializer = ProfileSerializer(comment.post.author)
+                print(comment.post.author)
+                cl.append(serializer.data)
+            elif isinstance(comment.post.author, Community):
+                serializer = CommunitySerializer(comment.post.author)
+                cl.append(serializer.data)
+        print(cl)
+        return Response(cl, status=status.HTTP_200_OK)
 # Create your views here.

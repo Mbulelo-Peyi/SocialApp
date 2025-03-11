@@ -2,6 +2,8 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django_countries.serializer_fields import CountryField
 from content.utils import get_community_model
+from notifications.models import Notification
+
 from content.models import(
     PostFile,
     Post,
@@ -55,13 +57,15 @@ class PostSerializer(serializers.ModelSerializer):
 
     def get_author_image_url(self, obj):
         request = self.context.get('request')
-        if isinstance(obj.author, Profile):
-            if obj.author.profile_pic.count() > 0:
-                return request.build_absolute_uri(obj.author.profile_pic.filter(is_active=True).first().picture.url)
-            else:
-                return request.build_absolute_uri(obj.author.image.url)
-        if isinstance(obj.author, Community):
-            return request.build_absolute_uri(obj.author.cover_image.url)
+        if request:
+            if isinstance(obj.author, Profile):
+                if obj.author.profile_pic.count() > 0:
+                    return request.build_absolute_uri(obj.author.profile_pic.filter(is_active=True).first().picture.url)
+                else:
+                    return request.build_absolute_uri(obj.author.image.url)
+            if isinstance(obj.author, Community):
+                return request.build_absolute_uri(obj.author.cover_image.url)
+        return None
 
 class ReactionSerializer(serializers.ModelSerializer):
     post = PostSerializer(read_only=True)
@@ -99,4 +103,20 @@ class CommentReplyPreocessingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CommentReply
+        fields = "__all__"
+
+class GenericNotificationRelatedField(serializers.RelatedField):
+    def to_representation(self, value):
+        if isinstance(value, Post):
+            serializer = PostSerializer(value)
+        return serializer.data
+
+class NotificationSerializer(serializers.ModelSerializer):
+    recipient = ProfileSerializer(read_only=True)
+    unread = serializers.BooleanField(read_only=True)
+    target = GenericNotificationRelatedField(read_only=True)
+
+
+    class Meta:
+        model = Notification
         fields = "__all__"

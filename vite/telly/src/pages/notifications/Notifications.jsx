@@ -69,7 +69,7 @@ const Notifications = () =>{
         };
         try {
             const response = await api.get(
-            `/inbox/notifications/api/notifications/?page=${pageParam}`,
+            `/content/api/notifications/?page=${pageParam}`,
                 config
             )
             return response.data;
@@ -86,7 +86,7 @@ const Notifications = () =>{
         };
         try {
             const response = await api.get(
-            `/inbox/notifications/api/notifications/${id}/`,
+            `/content/api/notifications/${id}/`,
                 config
             )
             return response.data;
@@ -103,7 +103,7 @@ const Notifications = () =>{
         };
         try {
             const response = await api.delete(
-            `/inbox/notifications/api/notifications/${id}/`,
+            `/content/api/notifications/${id}/`,
                 config
             )
             return response.data;

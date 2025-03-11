@@ -2,6 +2,7 @@ from ipware.ip import get_client_ip
 from django.contrib.gis.geoip2 import GeoIP2
 from django_user_agents.utils import get_user_agent
 from user.models import MembershipRequest, Community, MediaMessage
+from rest_framework import mixins, viewsets
 from django.contrib.contenttypes.models import ContentType
 
 def get_client_ip(request):
@@ -77,3 +78,16 @@ def geo_tag(request, user):
     user.browser = browser
     user.browser_version = browser_version
     user.save()
+
+
+
+class NotificationsBaseViewSet(mixins.RetrieveModelMixin,
+                           mixins.UpdateModelMixin,
+                            mixins.DestroyModelMixin,
+                           mixins.ListModelMixin,
+                           viewsets.GenericViewSet):
+    """
+    A viewset that provides default `retrieve()`, `update()`,
+    `partial_update()`, `destroy()` and `list()` actions.
+    """
+    pass
