@@ -28,6 +28,14 @@ SocialApp is a social networking application that combines a Django-powered back
 - **Modern Frontend:**  
   Built with JavaScript and Vite, the frontend provides a responsive, single-page application (SPA) experience.
 
+### Additional Features
+
+- **Cursor Behavior**:  
+  A jQuery script hides the cursor after 5 seconds of inactivity and restores it when the mouse is moved.
+- **Slideshow Navigation**:  
+  Users can navigate through images and videos in posts using slideshow buttons for a smoother media experience.
+
+
 ## Repository Structure
 
 - **content/**  
